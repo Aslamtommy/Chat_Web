@@ -13,6 +13,8 @@ const HomePage: React.FC = () => {
     const fetchChat = async () => {
       if (user) {
         const { data } = await api.get(`/chat/history/${user._id}`);
+
+        console.log(data)
         // Optionally set initial messages if needed
       }
     };
