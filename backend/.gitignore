@@ -1,0 +1,8 @@
+node_modules/
+
+
+.env
+
+logs/
+dist/
+src/config/Firebase/serviceAccountKey.json
