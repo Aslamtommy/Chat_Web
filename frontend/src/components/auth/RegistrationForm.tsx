@@ -14,11 +14,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Register payload:', { username, email, password });
     await api.post('/auth/register', { username, email, password });
     const { data }: any = await api.post('/auth/login', { email, password });
     onLogin(data.token, data.user);
   };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <input

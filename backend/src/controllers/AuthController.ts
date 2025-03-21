@@ -4,13 +4,20 @@ import AuthService from '../services/AuthService';
 class AuthController {
   async register(req: Request, res: Response): Promise<void> {
     try {
+      console.log('Register request body:', req.body);
       const user = await AuthService.register(req.body);
       res.status(201).json({ message: 'User created', user });
     } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+      console.error('Register error:', (error as Error).message);
+      if ((error as any).code === 11000) {
+        // MongoDB duplicate key error
+        const field = Object.keys((error as any).keyValue)[0];
+        res.status(400).json({ error: `${field} already exists` });
+      } else {
+        res.status(400).json({ error: (error as Error).message });
+      }
     }
   }
-
   async login(req: Request, res: Response): Promise<void> {
     try {
       console.log('hi');
