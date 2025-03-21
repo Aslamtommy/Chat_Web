@@ -1,3 +1,4 @@
+// AdminDashboard.tsx
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useChat } from '../hooks/useChat';
@@ -14,7 +15,7 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchThreads = async () => {
-      const { data }: any = await api.get('/chat/all');
+      const { data } :any= await api.get('/chat/all');
       setThreads(data);
     };
     if (user?.role === 'admin') fetchThreads();
