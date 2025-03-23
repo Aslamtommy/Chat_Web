@@ -8,10 +8,10 @@ import { useNavigate } from 'react-router-dom';
 import { UserCircle, LogOut, X } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { threads, messages, sendMessage } = useAdminChat(selectedUserId);
+  const { threads, messages, sendMessage, threadsLoading, messagesLoading } = useAdminChat(selectedUserId);
   const navigate = useNavigate();
 
   const fadeIn = {
@@ -25,13 +25,39 @@ const AdminDashboard: React.FC = () => {
   };
 
   const selectedUser = threads && selectedUserId
-    ? (threads as any[]).find((t: any) => {
+    ? threads.find((t: any) => {
         const tUserId = t.user_id instanceof Object ? t.user_id._id?.toString() : t.user_id;
         return tUserId === selectedUserId;
       })?.user_id
     : null;
 
-  if (!user || user.role !== 'admin') {
+  // Show loading spinner while authentication is being resolved or user is not yet set
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="flex items-center space-x-3"
+        >
+          <svg
+            className="animate-spin h-8 w-8 text-indigo-600"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z" />
+          </svg>
+          <span className="text-lg text-gray-700 font-medium">Loading...</span>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Check if the user is an admin after loading is complete and user is set
+  if (user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <motion.div
@@ -46,6 +72,7 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
+  // Render the admin dashboard content
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Header */}
@@ -82,10 +109,22 @@ const AdminDashboard: React.FC = () => {
           className="w-72 bg-white border-r border-gray-200 fixed top-16 left-0 bottom-0 p-6 overflow-y-auto"
         >
           <h2 className="text-lg font-semibold text-gray-800 mb-6">Chat Threads</h2>
-          {!threads || threads.length === 0 ? (
+          {threadsLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <svg
+                className="animate-spin h-6 w-6 text-indigo-600"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z" />
+              </svg>
+            </div>
+          ) : !threads || threads.length === 0 ? (
             <p className="text-gray-500 text-sm">No active threads</p>
           ) : (
-            (threads as any[]).map((thread: any) => {
+            threads.map((thread: any) => {
               const threadId = thread._id?.toString() || `thread-${Math.random()}`;
               const userId = thread.user_id instanceof Object ? thread.user_id._id?.toString() : thread.user_id;
               const username = thread.user_id instanceof Object ? thread.user_id.username || 'Unknown' : userId || 'Unknown';
@@ -97,9 +136,7 @@ const AdminDashboard: React.FC = () => {
                   key={threadId}
                   onClick={() => setSelectedUserId(userId)}
                   className={`p-3 rounded-md mb-2 cursor-pointer text-sm ${
-                    selectedUserId === userId
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
+                    selectedUserId === userId ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'
                   } transition-colors`}
                   whileHover={{ scale: 1.02 }}
                 >
@@ -127,7 +164,21 @@ const AdminDashboard: React.FC = () => {
                 </motion.button>
               </div>
               <div className="h-[calc(100vh-12rem)] flex flex-col">
-                <AdminChatWindow messages={messages as any[]} adminId={user._id.toString()} />
+                {messagesLoading ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <svg
+                      className="animate-spin h-8 w-8 text-indigo-600"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z" />
+                    </svg>
+                  </div>
+                ) : (
+                  <AdminChatWindow messages={messages} adminId={user._id.toString()} />
+                )}
                 <MessageInput sendMessage={sendMessage} />
               </div>
             </div>

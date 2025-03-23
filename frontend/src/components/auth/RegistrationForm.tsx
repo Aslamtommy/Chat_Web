@@ -3,10 +3,10 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 interface RegisterFormProps {
-  onLogin: (token: string, user: any) => void;
+  onRegisterSuccess: (email: string) => void;
 }
 
-const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
+const RegisterForm: React.FC<RegisterFormProps> = ({ onRegisterSuccess }) => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,6 +17,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
   const [place, setPlace] = useState('');
   const [district, setDistrict] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false); // Added loading state
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -38,8 +39,10 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
     setErrors({});
     if (!validateForm()) return;
 
+    setIsLoading(true); // Start loading
+
     try {
-      const registerResponse: any = await api.post('/auth/register', {
+      const response: any = await api.post('/auth/register', {
         username,
         email,
         password,
@@ -50,15 +53,12 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
         place,
         district,
       });
-      if (registerResponse.data.success) {
-        const { data }: any = await api.post('/auth/login', { email, password });
-        if (data.success) {
-          onLogin(data.data.token, data.data.user);
-        } else {
-          toast.error(data.error);
-        }
+
+      if (response.data.success) {
+        toast.success('Registration successful! Please log in.');
+        onRegisterSuccess(email);
       } else {
-        const errorMessage = registerResponse.data.error;
+        const errorMessage = response.data.error || 'Registration failed';
         if (errorMessage === 'Email already exists') {
           setErrors({ email: 'Email already exists' });
         } else {
@@ -70,13 +70,15 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
       const errorMessage = error.response?.data?.error || 'An error occurred during registration';
       setErrors({ general: errorMessage });
       toast.error(errorMessage);
+    } finally {
+      setIsLoading(false); // Stop loading
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div>
-        <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="username" className="block text-sm font-medium text-gray-900">
           Username
         </label>
         <input
@@ -85,15 +87,16 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Enter your username"
-          className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+          disabled={isLoading}
+          className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
             errors.username ? 'border-red-500' : 'border-gray-300'
-          }`}
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
-        {errors.username && <p className="mt-1 text-sm text-red-600">{errors.username}</p>}
+        {errors.username && <p className="mt-2 text-sm text-red-600">{errors.username}</p>}
       </div>
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-          Email
+        <label htmlFor="email" className="block text-sm font-medium text-gray-900">
+          Email Address
         </label>
         <input
           id="email"
@@ -101,14 +104,15 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Enter your email"
-          className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+          disabled={isLoading}
+          className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
             errors.email ? 'border-red-500' : 'border-gray-300'
-          }`}
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
-        {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+        {errors.email && <p className="mt-2 text-sm text-red-600">{errors.email}</p>}
       </div>
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="password" className="block text-sm font-medium text-gray-900">
           Password
         </label>
         <input
@@ -117,15 +121,16 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Enter your password"
-          className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+          disabled={isLoading}
+          className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
             errors.password ? 'border-red-500' : 'border-gray-300'
-          }`}
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
-        {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
+        {errors.password && <p className="mt-2 text-sm text-red-600">{errors.password}</p>}
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="age" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="age" className="block text-sm font-medium text-gray-900">
             Age
           </label>
           <input
@@ -134,14 +139,15 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
             value={age}
             onChange={(e) => setAge(e.target.value)}
             placeholder="Enter your age"
-            className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+            disabled={isLoading}
+            className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
               errors.age ? 'border-red-500' : 'border-gray-300'
-            }`}
+            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           />
-          {errors.age && <p className="mt-1 text-sm text-red-600">{errors.age}</p>}
+          {errors.age && <p className="mt-2 text-sm text-red-600">{errors.age}</p>}
         </div>
         <div>
-          <label htmlFor="phoneNo" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="phoneNo" className="block text-sm font-medium text-gray-900">
             Phone Number
           </label>
           <input
@@ -150,15 +156,16 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
             value={phoneNo}
             onChange={(e) => setPhoneNo(e.target.value)}
             placeholder="Enter your phone number"
-            className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+            disabled={isLoading}
+            className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
               errors.phoneNo ? 'border-red-500' : 'border-gray-300'
-            }`}
+            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           />
-          {errors.phoneNo && <p className="mt-1 text-sm text-red-600">{errors.phoneNo}</p>}
+          {errors.phoneNo && <p className="mt-2 text-sm text-red-600">{errors.phoneNo}</p>}
         </div>
       </div>
       <div>
-        <label htmlFor="fathersName" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="fathersName" className="block text-sm font-medium text-gray-900">
           Father's Name
         </label>
         <input
@@ -167,14 +174,15 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
           value={fathersName}
           onChange={(e) => setFathersName(e.target.value)}
           placeholder="Enter father's name"
-          className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+          disabled={isLoading}
+          className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
             errors.fathersName ? 'border-red-500' : 'border-gray-300'
-          }`}
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
-        {errors.fathersName && <p className="mt-1 text-sm text-red-600">{errors.fathersName}</p>}
+        {errors.fathersName && <p className="mt-2 text-sm text-red-600">{errors.fathersName}</p>}
       </div>
       <div>
-        <label htmlFor="mothersName" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="mothersName" className="block text-sm font-medium text-gray-900">
           Mother's Name
         </label>
         <input
@@ -183,15 +191,16 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
           value={mothersName}
           onChange={(e) => setMothersName(e.target.value)}
           placeholder="Enter mother's name"
-          className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+          disabled={isLoading}
+          className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
             errors.mothersName ? 'border-red-500' : 'border-gray-300'
-          }`}
+          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
-        {errors.mothersName && <p className="mt-1 text-sm text-red-600">{errors.mothersName}</p>}
+        {errors.mothersName && <p className="mt-2 text-sm text-red-600">{errors.mothersName}</p>}
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="place" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="place" className="block text-sm font-medium text-gray-900">
             Place
           </label>
           <input
@@ -200,14 +209,15 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
             value={place}
             onChange={(e) => setPlace(e.target.value)}
             placeholder="Enter your place"
-            className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+            disabled={isLoading}
+            className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
               errors.place ? 'border-red-500' : 'border-gray-300'
-            }`}
+            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           />
-          {errors.place && <p className="mt-1 text-sm text-red-600">{errors.place}</p>}
+          {errors.place && <p className="mt-2 text-sm text-red-600">{errors.place}</p>}
         </div>
         <div>
-          <label htmlFor="district" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="district" className="block text-sm font-medium text-gray-900">
             District
           </label>
           <input
@@ -216,19 +226,51 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onLogin }) => {
             value={district}
             onChange={(e) => setDistrict(e.target.value)}
             placeholder="Enter your district"
-            className={`mt-1 w-full p-3 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+            disabled={isLoading}
+            className={`mt-2 w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors duration-200 ${
               errors.district ? 'border-red-500' : 'border-gray-300'
-            }`}
+            } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           />
-          {errors.district && <p className="mt-1 text-sm text-red-600">{errors.district}</p>}
+          {errors.district && <p className="mt-2 text-sm text-red-600">{errors.district}</p>}
         </div>
       </div>
-      {errors.general && <p className="text-sm text-red-600">{errors.general}</p>}
+      {errors.general && <p className="text-sm text-red-600 text-center">{errors.general}</p>}
       <button
         type="submit"
-        className="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 transition-colors font-medium"
+        disabled={isLoading}
+        className={`w-full py-3 rounded-lg font-semibold text-white shadow-md transition-all duration-300 ${
+          isLoading
+            ? 'bg-indigo-400 cursor-not-allowed'
+            : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg'
+        }`}
       >
-        Register
+        {isLoading ? (
+          <span className="flex items-center justify-center">
+            <svg
+              className="animate-spin h-5 w-5 mr-2 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z"
+              ></path>
+            </svg>
+            Registering...
+          </span>
+        ) : (
+          'Register'
+        )}
       </button>
     </form>
   );

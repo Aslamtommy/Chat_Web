@@ -35,7 +35,8 @@ app.use((req, res, next) => {
 
 // Handle OPTIONS explicitly  
 app.options('*', cors({
-  origin: 'https://chat-web-ruddy-five.vercel.app',
+  origin: ['https://chat-web-ruddy-five.vercel.app',
+  'http://localhost:5173'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));

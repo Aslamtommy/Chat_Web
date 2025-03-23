@@ -1,15 +1,12 @@
 import React from 'react';
-import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import RegisterForm from '../components/auth/RegistrationForm';
 
 const RegisterPage: React.FC = () => {
-  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (token: string, user: any) => {
-    login(token, user);
-    navigate(user.role === 'admin' ? '/admin' : '/home');
+  const handleRegisterSuccess = (email: string) => {
+    navigate('/login', { state: { email } }); // Pass email to login page
   };
 
   return (
@@ -19,7 +16,7 @@ const RegisterPage: React.FC = () => {
           <h2 className="text-3xl font-bold text-gray-900">Create an Account</h2>
           <p className="mt-2 text-sm text-gray-600">Join us today</p>
         </div>
-        <RegisterForm onLogin={handleLogin} />
+        <RegisterForm onRegisterSuccess={handleRegisterSuccess} />
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Already have an account?{' '}

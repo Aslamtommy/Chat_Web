@@ -1,13 +1,13 @@
+// hooks/useAuth.tsx
 import { useState, useEffect } from 'react';
 import { setToken, getToken, removeToken } from '../utils/auth';
 import { setAuthToken, removeAuthToken } from '../services/api';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
- 
 export const useAuth = () => {
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Loading state starts as true
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -16,14 +16,14 @@ export const useAuth = () => {
         setAuthToken(token);
         await fetchUserData(token);
       }
-      setLoading(false);
+      setLoading(false); // Set loading to false after initialization
     };
     initializeAuth();
   }, []);
 
   const fetchUserData = async (token: string) => {
     try {
-      const response:any = await api.get('/auth/me', {
+      const response: any = await api.get('/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
 
