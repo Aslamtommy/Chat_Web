@@ -13,66 +13,66 @@ declare module 'express' {
   }
 }
 
-// Load environment variables (still needed for MongoDB, Cloudinary, etc.)
 dotenv.config();
 
-// Initialize Express app
 const app: Express = express();
 
-// Define allowed origins (hardcoded)
 const allowedOrigins = [
-  'http://localhost:5173',              // Local development
-  'https://chat-web-sable-beta.vercel.app', // Production frontend
+  'http://localhost:5173',
+  'https://chat-web-sable-beta.vercel.app',
 ];
 
-// CORS configuration
+// Apply CORS middleware first with detailed logging
 app.use(cors({
   origin: (origin, callback) => {
-    console.log('Incoming Origin:', origin); // Debug log
+    console.log('Incoming Origin:', origin);
     if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, origin || '*'); // Reflect the origin or '*' if no origin
+      callback(null, origin || '*');
     } else {
       console.log('CORS Rejected Origin:', origin);
-      callback(new Error('Not allowed by CORS')); // Reject unallowed origins
+      callback(new Error('Not allowed by CORS'));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: true, // Allow credentials (e.g., Authorization header with tokens)
+  credentials: true,
 }));
 
-// Explicitly handle OPTIONS preflight requests
-app.options('*', cors());
+// Explicitly handle all OPTIONS requests
+app.options('*', (req, res) => {
+  console.log('Handling OPTIONS for:', req.path);
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(204); // No Content
+});
 
-// Parse JSON bodies
+// Parse JSON bodies after CORS
 app.use(express.json());
 
-// Routes
+// Routes after middleware
 app.use('/auth', authRoutes);
 app.use('/chat', chatRoutes);
 app.use('/upload', uploadRoutes);
 
-// Root route
 app.get('/', (req: Request, res: Response) => {
   console.log('GET / accessed');
   res.send('Backend is running');
 });
 
-// MongoDB connection
 const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 if (!mongoUri) {
   console.error('Error: MONGODB_URI is not defined in environment variables');
   process.exit(1);
 }
 
-// Log Cloudinary config
 console.log('Cloudinary Config:', {
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET ? 'Loaded' : 'Not Loaded',
 });
 
-// Log allowed origins for debugging
 console.log('Allowed Origins:', allowedOrigins);
 
 mongoose.connect(mongoUri)
@@ -82,18 +82,17 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
-// Start the server
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   console.log(`Server started on port ${port} with HTTP`);
 });
 
-// Keep alive and log errors
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on(
+  'unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
