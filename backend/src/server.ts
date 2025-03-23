@@ -13,24 +13,26 @@ declare module 'express' {
   }
 }
 
-// Load environment variables
+// Load environment variables (still needed for MongoDB, Cloudinary, etc.)
 dotenv.config();
 
 // Initialize Express app
 const app: Express = express();
 
-// Define allowed origins from .env
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:5173']; // Fallback to localhost if not set
+// Define allowed origins (hardcoded)
+const allowedOrigins = [
+  'http://localhost:5173',              // Local development
+  'https://chat-web-sable-beta.vercel.app', // Production frontend
+];
 
 // CORS configuration
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g., server-to-server) or if origin is in allowedOrigins
+    console.log('Incoming Origin:', origin); // Debug log
     if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, origin || '*'); // Reflect the origin or use '*' if no origin
+      callback(null, origin || '*'); // Reflect the origin or '*' if no origin
     } else {
+      console.log('CORS Rejected Origin:', origin);
       callback(new Error('Not allowed by CORS')); // Reject unallowed origins
     }
   },
@@ -38,6 +40,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true, // Allow credentials (e.g., Authorization header with tokens)
 }));
+
+// Explicitly handle OPTIONS preflight requests
+app.options('*', cors());
 
 // Parse JSON bodies
 app.use(express.json());
