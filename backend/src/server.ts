@@ -16,16 +16,24 @@ dotenv.config();
 
 const app: Express = express();
 
-// Logging middleware
+// Detailed logging
 app.use((req, res, next) => {
-  console.log('Request:', req.method, req.url, 'Origin:', req.headers.origin);
+  console.log('Request Received:', {
+    method: req.method,
+    url: req.url,
+    origin: req.headers.origin,
+    headers: req.headers,
+  });
   res.on('finish', () => {
-    console.log('Response Headers:', res.getHeaders());
+    console.log('Response Sent:', {
+      status: res.statusCode,
+      headers: res.getHeaders(),
+    });
   });
   next();
 });
 
-// Explicit OPTIONS handling
+// Handle OPTIONS explicitly
 app.options('*', cors({
   origin: 'https://chat-web-beta-ten.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -40,6 +48,11 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Test endpoint
+app.get('/test', (req: Request, res: Response) => {
+  res.json({ message: 'CORS test' });
+});
 
 app.use('/auth', authRoutes);
 app.use('/chat', chatRoutes);
