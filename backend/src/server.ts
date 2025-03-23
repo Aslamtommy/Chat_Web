@@ -14,9 +14,9 @@ declare module 'express' {
 
 dotenv.config();
 
-const app: Express = express();
+const app: Express = express(); 
 
-const allowedOrigins = ['https://chat-web-sable-beta.vercel.app'];
+const allowedOrigins = ['https://chat-web-swart-sigma.vercel.app'];
 
 app.use((req, res, next) => {
   console.log(`Request: ${req.method} ${req.path}`);
