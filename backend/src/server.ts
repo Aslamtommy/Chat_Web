@@ -6,7 +6,6 @@ import chatRoutes from './routes/chat';
 import uploadRoutes from './routes/upload';
 import dotenv from 'dotenv';
 
-// Extend Express Request interface to include user property
 declare module 'express' {
   export interface Request {
     user?: { id: string; role: string };
@@ -17,16 +16,19 @@ dotenv.config();
 
 const app: Express = express();
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://chat-web-sable-beta.vercel.app',
-];
+const allowedOrigins = ['https://chat-web-sable-beta.vercel.app'];
 
-// Apply CORS middleware first with detailed logging
+app.use((req, res, next) => {
+  console.log(`Request: ${req.method} ${req.path}`);
+  next();
+});
+
 app.use(cors({
   origin: (origin, callback) => {
     console.log('Incoming Origin:', origin);
+    console.log('Allowed Origins:', allowedOrigins);
     if (!origin || allowedOrigins.includes(origin)) {
+      console.log('Origin allowed:', origin);
       callback(null, origin || '*');
     } else {
       console.log('CORS Rejected Origin:', origin);
@@ -38,20 +40,17 @@ app.use(cors({
   credentials: true,
 }));
 
-// Explicitly handle all OPTIONS requests
 app.options('*', (req, res) => {
   console.log('Handling OPTIONS for:', req.path);
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(204); // No Content
+  res.sendStatus(204);
 });
 
-// Parse JSON bodies after CORS
 app.use(express.json());
 
-// Routes after middleware
 app.use('/auth', authRoutes);
 app.use('/chat', chatRoutes);
 app.use('/upload', uploadRoutes);
@@ -91,8 +90,7 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
-process.on(
-  'unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
