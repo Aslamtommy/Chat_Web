@@ -5,5 +5,5 @@ node_modules/
 
 logs/
 dist/
-src/config/Firebase/serviceAccountKey.json
+ 
 .vercel

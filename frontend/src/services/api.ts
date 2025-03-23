@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL:   'backend-pi-bice-86.vercel.app/user',
+  baseURL: 'http://localhost:5000/user', // Adjust if your backend runs elsewhere
 });
 
 export const setAuthToken = (token: string) => {

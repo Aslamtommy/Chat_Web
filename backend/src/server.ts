@@ -21,13 +21,14 @@ const app: Express = express();
 
 // Define allowed origins
 const allowedOrigins = [
-  'frontend-one-sigma-38.vercel.app', // Local frontend
+  
+  'http://localhost:5173',  
 ];
 
 // Manual CORS middleware (force headers)
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Origin: ${origin}`);
+ 
   
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -37,19 +38,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
-    console.log('Handling OPTIONS preflight');
-    res.status(200).end();
-    return;
-  }
+ 
   next();
 });
 
 // Fallback CORS package (optional redundancy)
 app.use(cors({
   origin: (origin, callback) => {
-    console.log('CORS package - Origin:', origin);
+     
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {

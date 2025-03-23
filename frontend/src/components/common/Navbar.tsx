@@ -1,40 +1,60 @@
+// components/common/Navbar.tsx
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { motion, MotionProps } from 'framer-motion';
+
+// Define a type that combines MotionProps with button-specific props
+type MotionButtonProps = MotionProps & React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate(); // Hook to programmatically navigate
+  const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout(); // Clear user state and token
-    navigate('/'); // Redirect to landing page
+    logout();
+    navigate('/');
   };
 
   return (
-    <nav className="bg-gray-800 p-4 shadow-md">
+    <nav className="bg-gradient-to-r from-gray-800 to-gray-700 p-4 shadow-lg">
       <div className="container mx-auto flex justify-between items-center">
-        <Link to="/" className="text-white text-lg font-bold">Chat App</Link>
-        <div className="space-x-4">
+        <Link to="/" className="text-white text-xl font-serif font-semibold tracking-wide">
+          Arabic Jyothisham
+        </Link>
+        <div className="space-x-6">
           {!user ? (
             <>
-              <Link to="/login" className="text-white hover:text-gray-300">Login</Link>
-              <Link to="/register" className="text-white hover:text-gray-300">Register</Link>
+              <Link to="/login" className="text-white hover:text-gray-200 transition-colors duration-200">
+                Login
+              </Link>
+              <Link to="/register" className="text-white hover:text-gray-200 transition-colors duration-200">
+                Register
+              </Link>
             </>
           ) : (
             <>
               <Link
                 to={user.role === 'admin' ? '/admin' : '/home'}
-                className="text-white hover:text-gray-300"
+                className="text-white hover:text-gray-200 transition-colors duration-200"
               >
                 {user.role === 'admin' ? 'Dashboard' : 'Home'}
               </Link>
-              <button
-                onClick={handleLogout} // Use the new handler
-                className="text-white hover:text-gray-300 focus:outline-none"
+              <Link
+                to="/profile"
+                className="text-white hover:text-gray-200 transition-colors duration-200"
+              >
+                Profile
+              </Link>
+              <motion.button
+                onClick={handleLogout}
+                className="text-white hover:text-gray-200 focus:outline-none transition-colors duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                {...({} as MotionButtonProps)} // Type assertion to ensure compatibility
               >
                 Logout
-              </button>
+              </motion.button>
             </>
           )}
         </div>

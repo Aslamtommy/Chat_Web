@@ -1,39 +1,62 @@
+// App.tsx
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import HomePage from './pages/HomePage';
+import UserHomePage from './pages/UserHomePage';
 import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
+import AdminLoginPage from './pages/AdminLoginPage';
 import RegisterPage from './pages/RegisterPage';
 import LandingPage from './pages/LandingPage';
+import ProfilePage from './pages/ProfilePage'; // Added import
 import ProtectedRoute from './components/ProtectedRoute';
-import Layout from './components/Layout'; // Assuming you want a consistent layout
+import Layout from './components/Layout';
+import { Toaster } from 'react-hot-toast';
+import ChatPage from './pages/ChatPage';
 
-const App = () => (
+const App: React.FC = () => (
   <BrowserRouter>
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route
-        path="/home"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <HomePage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <AdminDashboard />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+    <>
+      <Toaster   />
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin-login" element={<AdminLoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/chat" element={<ChatPage />} />
+
+        {/* Protected Routes */}
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <UserHomePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <AdminDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ProfilePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </>
   </BrowserRouter>
 );
 

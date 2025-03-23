@@ -1,3 +1,13 @@
+/* tailwind.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #1e3a8a;  /* Navy Blue */
+    --secondary: #d4af37; /* Gold */
+    --accent: #f3f4f6;    /* Light Gray */
+    --text: #1f2937;      /* Dark Gray */
+  }
+}

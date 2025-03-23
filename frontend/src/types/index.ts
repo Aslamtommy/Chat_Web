@@ -1,19 +1,16 @@
-export interface IUser {
-    _id: string;
-    username: string;
-    email: string;
-    role: 'user' | 'admin';
-  }
-  
-  export interface IMessage {
-    sender_id: string;
-    message_type: 'text' | 'image';
-    content: string;
-    timestamp: string;
-  }
-  
-  export interface IChatThread {
-    _id: string;
-    user_id: string;
-    messages: IMessage[];
-  }
+import { Types } from 'mongoose';
+
+ 
+export interface IMessage {
+  _id?: Types.ObjectId;
+  sender_id: Types.ObjectId;
+  message_type: 'text' | 'image';
+  content: string;
+  timestamp: Date;
+}
+
+export interface IChatThread {
+  _id: Types.ObjectId;
+  user_id: Types.ObjectId | any; // Union type: raw ObjectId or populated user object
+  messages: IMessage[];
+}

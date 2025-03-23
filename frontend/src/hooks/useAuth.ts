@@ -1,56 +1,54 @@
 import { useState, useEffect } from 'react';
 import { setToken, getToken, removeToken } from '../utils/auth';
 import { setAuthToken, removeAuthToken } from '../services/api';
-import { IUser } from '../types';
+import toast from 'react-hot-toast';
 
 export const useAuth = () => {
-  const [user, setUser] = useState<IUser | null>(null);
-  const [loading, setLoading] = useState(true); // Add loading state
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const initializeAuth = async () => {
       const token = getToken();
       if (token) {
-        console.log('Token found on mount:', token);
         setAuthToken(token);
         await fetchUserData(token);
       }
-      setLoading(false); // Mark loading complete after initialization
+      setLoading(false);
     };
     initializeAuth();
   }, []);
 
   const fetchUserData = async (token: string) => {
     try {
-      console.log('Fetching user data with token:', token);
       const response = await fetch('http://localhost:5000/user/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Response status:', response.status);
-      if (!response.ok) throw new Error('Invalid token');
-      const userData = await response.json();
-      console.log('User data received:', userData);
-      setUser(userData);
+      const data = await response.json();
+      if (data.success) {
+        setUser(data.data);
+      } else {
+        throw new Error(data.error);
+      }
     } catch (error) {
-      console.error('Error fetching user:', error);
+      toast.error('Failed to fetch user data');
       logout();
     }
   };
 
-  const login = (token: string, userData: IUser) => {
-    console.log('Logging in with:', { token, userData });
+  const login = (token: string, userData: any) => {
     setToken(token);
     setAuthToken(token);
     setUser(userData);
+    toast.success('Logged in successfully');
   };
 
   const logout = () => {
-    console.log('Logging out');
     removeToken();
     removeAuthToken();
     setUser(null);
-    
+    toast.success('Logged out successfully');
   };
 
-  return { user, login, logout, loading };
+  return { user, setUser, login, logout, loading };
 };

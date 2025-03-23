@@ -1,3 +1,4 @@
+// repositories/ChatRepository.ts
 import ChatThread from '../models/ChatThread';
 import { IChatThread, IMessage } from '../types';
 
@@ -20,7 +21,7 @@ class ChatRepository {
   }
 
   async getAllThreads(): Promise<IChatThread[]> {
-    return ChatThread.find().populate('user_id', 'username');
+    return ChatThread.find().populate('user_id', '-password'); // Populate all fields except password
   }
 }
 

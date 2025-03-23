@@ -13,10 +13,21 @@ const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-3xl font-bold text-gray-800 mb-6">Register</h2>
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-lg w-full bg-white rounded-lg shadow-lg p-8 space-y-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-gray-900">Create an Account</h2>
+          <p className="mt-2 text-sm text-gray-600">Join us today</p>
+        </div>
         <RegisterForm onLogin={handleLogin} />
+        <div className="text-center">
+          <p className="text-sm text-gray-600">
+            Already have an account?{' '}
+            <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+              Sign in here
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
