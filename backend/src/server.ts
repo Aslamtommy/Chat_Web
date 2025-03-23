@@ -33,16 +33,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Handle OPTIONS explicitly
+// Handle OPTIONS explicitly  
 app.options('*', cors({
-  origin: 'https://chat-web-beta-ten.vercel.app',
+  origin: 'https://chat-web-ruddy-five.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // CORS middleware
 app.use(cors({
-  origin: 'https://chat-web-beta-ten.vercel.app',
+  origin: 'https://chat-web-ruddy-five.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));

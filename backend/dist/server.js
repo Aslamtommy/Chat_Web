@@ -12,14 +12,39 @@ const upload_1 = __importDefault(require("./routes/upload"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-// CORS configuration
-app.use((0, cors_1.default)({
-    origin: 'https://chat-web-beta-ten.vercel.app',
+// Detailed logging
+app.use((req, res, next) => {
+    console.log('Request Received:', {
+        method: req.method,
+        url: req.url,
+        origin: req.headers.origin,
+        headers: req.headers,
+    });
+    res.on('finish', () => {
+        console.log('Response Sent:', {
+            status: res.statusCode,
+            headers: res.getHeaders(),
+        });
+    });
+    next();
+});
+// Handle OPTIONS explicitly  
+app.options('*', (0, cors_1.default)({
+    origin: 'https://chat-web-ruddy-five.vercel.app',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
+}));
+// CORS middleware
+app.use((0, cors_1.default)({
+    origin: 'https://chat-web-ruddy-five.vercel.app',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express_1.default.json());
+// Test endpoint
+app.get('/test', (req, res) => {
+    res.json({ message: 'CORS test' });
+});
 app.use('/auth', auth_1.default);
 app.use('/chat', chat_1.default);
 app.use('/upload', upload_1.default);
