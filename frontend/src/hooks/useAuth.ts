@@ -1,10 +1,19 @@
 import { useState, useEffect } from 'react';
 import { setToken, getToken, removeToken } from '../utils/auth';
 import { setAuthToken, removeAuthToken } from '../services/api';
+import api from '../services/api';
 import toast from 'react-hot-toast';
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  // Add other fields based on your API response
+}
+
 export const useAuth = () => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,22 +30,23 @@ export const useAuth = () => {
 
   const fetchUserData = async (token: string) => {
     try {
-      const response = await fetch('http://localhost:5000/user/auth/me', {
+      const response:any = await api.get('/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await response.json();
-      if (data.success) {
-        setUser(data.data);
+
+      if (response.data.success) {
+        setUser(response.data.data);
       } else {
-        throw new Error(data.error);
+        toast.error(response.data.message || 'Failed to fetch user data');
+        logout();
       }
-    } catch (error) {
-      toast.error('Failed to fetch user data');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to fetch user data');
       logout();
     }
   };
 
-  const login = (token: string, userData: any) => {
+  const login = (token: string, userData: User) => {
     setToken(token);
     setAuthToken(token);
     setUser(userData);
