@@ -4,16 +4,9 @@ import { setAuthToken, removeAuthToken } from '../services/api';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  // Add other fields based on your API response
-}
-
+ 
 export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,7 +39,7 @@ export const useAuth = () => {
     }
   };
 
-  const login = (token: string, userData: User) => {
+  const login = (token: string, userData: any) => {
     setToken(token);
     setAuthToken(token);
     setUser(userData);
