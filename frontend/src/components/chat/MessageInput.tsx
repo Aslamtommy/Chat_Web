@@ -1,4 +1,4 @@
-import React, { useState, useRef  } from 'react';
+import React, { useState, useRef } from 'react';
 import Button from '../common/Button';
 import { FaImage, FaMicrophone, FaStop } from 'react-icons/fa';
 
@@ -16,7 +16,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ sendMessage }) => {
   const [recordingTime, setRecordingTime] = useState(0); // Timer in seconds
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | NodeJS.Timeout | null>(null); // Widened type to fix error
 
   // Start recording audio with timer
   const startRecording = async () => {
