@@ -6,7 +6,7 @@ const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
 
   const handleRegisterSuccess = (email: string) => {
-    navigate('/login', { state: { email } }); // Pass email to login page
+    navigate('/login', { state: { email } });
   };
 
   return (
@@ -20,9 +20,12 @@ const RegisterPage: React.FC = () => {
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Already have an account?{' '}
-            <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <span
+              onClick={() => navigate('/login')}
+              className="font-medium text-indigo-600 hover:text-indigo-500 cursor-pointer"
+            >
               Sign in here
-            </a>
+            </span>
           </p>
         </div>
       </div>

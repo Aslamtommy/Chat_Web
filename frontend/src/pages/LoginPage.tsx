@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate, Link } from 'react-router-dom'; // Add Link
+import { useNavigate } from 'react-router-dom';
 import LoginForm from '../components/auth/LoginForm';
 import LoadingOverlay from '../components/common/LoadingOverlay';
 
@@ -29,9 +29,12 @@ const LoginPage: React.FC = () => {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Don’t have an account?{' '}
-              <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <span
+                onClick={() => navigate('/register')}
+                className="font-medium text-indigo-600 hover:text-indigo-500 cursor-pointer"
+              >
                 Register here
-              </Link>
+              </span>
             </p>
           </div>
         </div>

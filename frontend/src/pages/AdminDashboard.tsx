@@ -31,8 +31,7 @@ const AdminDashboard: React.FC = () => {
       })?.user_id
     : null;
 
-  // Show loading spinner while authentication is being resolved or user is not yet set
-  if (authLoading || !user) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <motion.div
@@ -56,8 +55,7 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  // Check if the user is an admin after loading is complete and user is set
-  if (user.role !== 'admin') {
+  if (!user || user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <motion.div
@@ -72,10 +70,8 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  // Render the admin dashboard content
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Header */}
       <motion.header
         initial="hidden"
         animate="visible"
@@ -99,9 +95,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       </motion.header>
 
-      {/* Main Layout */}
       <div className="flex pt-16">
-        {/* Sidebar */}
         <motion.aside
           initial="hidden"
           animate="visible"
@@ -147,7 +141,6 @@ const AdminDashboard: React.FC = () => {
           )}
         </motion.aside>
 
-        {/* Main Content */}
         <main className="flex-1 ml-72 p-6">
           {selectedUserId ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -190,7 +183,6 @@ const AdminDashboard: React.FC = () => {
         </main>
       </div>
 
-      {/* User Details Modal */}
       {isModalOpen && selectedUser && (
         <motion.div
           initial={{ opacity: 0 }}

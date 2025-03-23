@@ -1,12 +1,13 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, MotionProps } from 'framer-motion';
 import Button from '../components/common/Button';
 
-// Define a type that combines MotionProps with standard HTML div props
 type MotionDivProps = MotionProps & React.HTMLAttributes<HTMLDivElement>;
 
 const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+
   const fadeInUp = {
     hidden: { opacity: 0, y: 30 },
     visible: { opacity: 1, y: 0, transition: { duration: 1, ease: 'easeOut' } },
@@ -38,7 +39,6 @@ const LandingPage: React.FC = () => {
         <motion.div
           className="w-1 h-1 bg-yellow-200 rounded-full absolute top-1/5 left-1/4"
           animate={pulse}
-          // Explicitly cast to MotionDivProps to satisfy TypeScript
           {...({} as MotionDivProps)}
         />
         <motion.div
@@ -62,7 +62,6 @@ const LandingPage: React.FC = () => {
         <motion.h1
           className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 tracking-wide leading-tight font-cinzel text-yellow-50 drop-shadow-lg"
           variants={fadeInUp}
-          // Since this is motion.h1, we use HTMLHeadingElement instead
           {...({} as MotionProps & React.HTMLAttributes<HTMLHeadingElement>)}
         >
           Arabic Jyothisham
@@ -86,16 +85,18 @@ const LandingPage: React.FC = () => {
           variants={fadeInUp}
           {...({} as MotionDivProps)}
         >
-          <Link to="/register">
-            <Button className="px-10 py-4 text-lg md:text-xl bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-700 hover:to-yellow-600 transition-all duration-500 shadow-xl rounded-full font-semibold tracking-wide hover:shadow-2xl">
-              Start Your Journey
-            </Button>
-          </Link>
-          <Link to="/login">
-            <Button className="px-10 py-4 text-lg md:text-xl bg-transparent border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-gray-900 transition-all duration-500 shadow-xl rounded-full font-semibold tracking-wide hover:shadow-2xl">
-              Sign In
-            </Button>
-          </Link>
+          <Button
+            onClick={() => navigate('/register')}
+            className="px-10 py-4 text-lg md:text-xl bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-700 hover:to-yellow-600 transition-all duration-500 shadow-xl rounded-full font-semibold tracking-wide hover:shadow-2xl"
+          >
+            Start Your Journey
+          </Button>
+          <Button
+            onClick={() => navigate('/login')}
+            className="px-10 py-4 text-lg md:text-xl bg-transparent border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-gray-900 transition-all duration-500 shadow-xl rounded-full font-semibold tracking-wide hover:shadow-2xl"
+          >
+            Sign In
+          </Button>
         </motion.div>
         <motion.p
           className="mt-12 text-sm md:text-base lg:text-lg font-light text-gray-300 italic tracking-wide"

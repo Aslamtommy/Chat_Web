@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 import { motion, MotionProps } from 'framer-motion';
 import { X, User } from 'lucide-react';
 
-// Define custom types to combine MotionProps with HTML attributes
 type MotionDivProps = MotionProps & React.HTMLAttributes<HTMLDivElement>;
 type MotionButtonProps = MotionProps & React.ButtonHTMLAttributes<HTMLButtonElement>;
 
@@ -21,7 +20,6 @@ const ProfilePage: React.FC = () => {
     district: '',
   });
 
-  // Update formData when modal opens to reflect current user data
   useEffect(() => {
     if (isModalOpen && user) {
       setFormData({
@@ -96,7 +94,6 @@ const ProfilePage: React.FC = () => {
       {...({} as MotionDivProps)}
     >
       <div className="max-w-3xl w-full bg-white rounded-2xl shadow-xl p-8 space-y-8 transform transition-all hover:shadow-2xl border border-indigo-100">
-        {/* Header Section */}
         <div className="flex items-center space-x-4 border-b border-gray-200 pb-4">
           <div className="flex-shrink-0">
             <User className="h-16 w-16 text-indigo-600" />
@@ -107,7 +104,6 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Profile Details */}
         <div className="space-y-6">
           <h3 className="text-xl font-semibold text-gray-800">Profile Details</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -137,7 +133,6 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Profile Modal */}
       {isModalOpen && (
         <motion.div
           initial="hidden"
