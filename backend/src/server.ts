@@ -14,16 +14,16 @@ declare module 'express' {
 
 dotenv.config();
 
-const app: Express = express(); 
- 
+const app: Express = express();
 
- 
+// CORS configuration
+app.use(cors({
+  origin: 'https://chat-web-beta-ten.vercel.app',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
 
-app.use(cors( 
-  
- ));
-
- 
 app.use(express.json());
 
 app.use('/auth', authRoutes);
@@ -41,14 +41,6 @@ if (!mongoUri) {
   process.exit(1);
 }
 
-console.log('Cloudinary Config:', {
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET ? 'Loaded' : 'Not Loaded',
-});
-
- 
-
 mongoose.connect(mongoUri)
   .then(() => console.log('MongoDB connected'))
   .catch(err => {
@@ -59,14 +51,6 @@ mongoose.connect(mongoUri)
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
   console.log(`Server started on port ${port} with HTTP`);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 export default app;
