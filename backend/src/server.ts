@@ -44,9 +44,9 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
-app.use('/user/auth', authRoutes);
-app.use('/user/chat', chatRoutes);
-app.use('/user/upload', uploadRoutes);
+app.use('/auth', authRoutes);
+app.use('/chat', chatRoutes);
+app.use('/upload', uploadRoutes);
 
 // Root route
 app.get('/', (req: Request, res: Response) => {
