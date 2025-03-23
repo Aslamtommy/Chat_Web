@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom'; // Add Link
 import LoginForm from '../components/auth/LoginForm';
 import LoadingOverlay from '../components/common/LoadingOverlay';
 
@@ -29,9 +29,9 @@ const LoginPage: React.FC = () => {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Don’t have an account?{' '}
-              <a href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
                 Register here
-              </a>
+              </Link>
             </p>
           </div>
         </div>
