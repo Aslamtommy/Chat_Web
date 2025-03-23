@@ -1,3 +1,4 @@
+// backend/src/server.ts
 import express, { Express, Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -21,35 +22,17 @@ const app: Express = express();
 
 // Define allowed origins
 const allowedOrigins = [
-  
-  'http://localhost:5173',  
-];
+  'http://localhost:5173',
+  process.env.FRONTEND_URL,
+].filter(Boolean) as string[];
 
-// Manual CORS middleware (force headers)
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const origin = req.headers.origin;
- 
-  
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*'); // Fallback for testing
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
- 
-  next();
-});
-
-// Fallback CORS package (optional redundancy)
+// CORS configuration
 app.use(cors({
   origin: (origin, callback) => {
-     
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, '*'); // Fallback for testing
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -71,19 +54,40 @@ app.get('/', (req: Request, res: Response) => {
   res.send('Backend is running');
 });
 
-// MongoDB connection (skip in Vercel build phase)
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  mongoose.connect(process.env.MONGO_URI as string)
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+// MongoDB connection
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error('Error: MONGODB_URI is not defined in environment variables');
+  process.exit(1);
 }
 
-// Local testing only
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  const port = process.env.PORT || 5000;
-  app.listen(port, () => {
-    console.log(`Server started on port ${port} with HTTP`);
+// Log Cloudinary config
+console.log('Cloudinary Config:', {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET ? 'Loaded' : 'Not Loaded',
+});
+
+mongoose.connect(mongoUri)
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
   });
-}
+
+// Start the server
+const port = process.env.PORT || 5000;
+app.listen(port, () => {
+  console.log(`Server started on port ${port} with HTTP`);
+});
+
+// Keep alive and log errors
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 export default app;
