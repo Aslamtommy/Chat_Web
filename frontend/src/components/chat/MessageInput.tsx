@@ -64,7 +64,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ sendMessage }) => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/user/upload/${type === 'image' ? 'image' : 'audio'}`,
+        `https://chat-web-1ud8.onrender.com /user/upload/${type === 'image' ? 'image' : 'audio'}`,
         {
           method: 'POST',
           headers: {
