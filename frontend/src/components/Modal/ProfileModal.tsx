@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import profileService from '../Services/profileService';
 
-// Define interfaces with stricter typing and optional fields where applicable
 interface UserProfile {
   username: string;
   email: string;
@@ -25,7 +24,7 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // Added loading state
+  const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
@@ -44,12 +43,10 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     },
   });
 
-  // Fetch profile data when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchProfile();
     } else {
-      // Reset states when modal closes
       setProfile(null);
       setIsEditing(false);
       setError(null);
@@ -63,7 +60,6 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     try {
       const userData = await profileService.getProfile();
       setProfile(userData);
-      // Pre-fill form with fetched data
       Object.entries(userData).forEach(([key, value]) => {
         if (key in userData) {
           setValue(key as keyof ProfileForm, value as any);
@@ -81,13 +77,23 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     try {
       await profileService.updateProfile(data);
       setIsEditing(false);
-      await fetchProfile(); // Refresh profile after update
+      await fetchProfile();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update profile');
     }
   };
 
   if (!isOpen) return null;
+
+  // Common field configuration for both view and edit modes
+  const fields = [
+    { name: 'age', label: 'Age', icon: '👤', type: 'number', rules: { required: 'Age is required', min: { value: 1, message: 'Age must be positive' } } },
+    { name: 'fathersName', label: "Father's Name", icon: '👨', rules: { required: "Father's name is required" } },
+    { name: 'mothersName', label: "Mother's Name", icon: '👩', rules: { required: "Mother's name is required" } },
+    { name: 'phoneNo', label: 'Phone', icon: '📱', rules: { required: 'Phone number is required', pattern: { value: /^\d{10}$/, message: 'Must be 10 digits' } } },
+    { name: 'place', label: 'Place', icon: '🏠', rules: { required: 'Place is required' } },
+    { name: 'district', label: 'District', icon: '📍', rules: { required: 'District is required' } },
+  ];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300">
@@ -119,25 +125,24 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
             </div>
           ) : isEditing ? (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { name: 'age', type: 'number', placeholder: 'Age', rules: { required: 'Age is required', min: { value: 1, message: 'Age must be positive' } } },
-                  { name: 'fathersName', placeholder: "Father's Name", rules: { required: "Father's name is required" } },
-                  { name: 'mothersName', placeholder: "Mother's Name", rules: { required: "Mother's name is required" } },
-                  { name: 'phoneNo', placeholder: 'Phone Number', rules: { required: 'Phone number is required', pattern: { value: /^\d{10}$/, message: 'Must be 10 digits' } } },
-                  { name: 'place', placeholder: 'Place', rules: { required: 'Place is required' } },
-                  { name: 'district', placeholder: 'District', rules: { required: 'District is required' } },
-                ].map((field) => (
-                  <div key={field.name} className={field.name === 'phoneNo' ? 'sm:col-span-2' : ''}>
+              <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                {fields.map((field, index) => (
+                  <div
+                    key={field.name}
+                    className={`flex flex-col p-3 ${index !== fields.length - 1 ? 'border-b border-gray-100' : ''}`}
+                  >
+                    <div className="flex items-center mb-2">
+                      <span className="text-gray-400 mr-2">{field.icon}</span>
+                      <span className="text-gray-500 text-sm">{field.label}</span>
+                    </div>
                     <input
                       {...register(field.name as keyof ProfileForm, field.rules)}
                       type={field.type || 'text'}
-                      placeholder={field.placeholder}
                       disabled={isSubmitting}
                       className="w-full p-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all text-gray-700 bg-white shadow-sm disabled:bg-gray-100"
                     />
                     {errors[field.name as keyof ProfileForm] && (
-                      <span className="text-red-500 text-xs mt-1 block">
+                      <span className="text-red-500 text-xs mt-1">
                         {errors[field.name as keyof ProfileForm]?.message}
                       </span>
                     )}
@@ -175,21 +180,16 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
               </div>
 
               <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-                {[
-                  { label: 'Age', value: profile.age, icon: '👤' },
-                  { label: "Father's Name", value: profile.fathersName, icon: '👨' },
-                  { label: "Mother's Name", value: profile.mothersName, icon: '👩' },
-                  { label: 'Phone', value: profile.phoneNo, icon: '📱' },
-                  { label: 'Place', value: profile.place, icon: '🏠' },
-                  { label: 'District', value: profile.district, icon: '📍' },
-                ].map((item, index) => (
+                {fields.map((field, index) => (
                   <div
-                    key={item.label}
-                    className={`flex items-center p-3 ${index !== 5 ? 'border-b border-gray-100' : ''}`}
+                    key={field.label}
+                    className={`flex items-center p-3 ${index !== fields.length - 1 ? 'border-b border-gray-100' : ''}`}
                   >
-                    <span className="text-gray-400 mr-2">{item.icon}</span>
-                    <span className="text-gray-500 text-sm">{item.label}</span>
-                    <span className="ml-auto text-gray-800 font-medium">{item.value}</span>
+                    <span className="text-gray-400 mr-2">{field.icon}</span>
+                    <span className="text-gray-500 text-sm">{field.label}</span>
+                    <span className="ml-auto text-gray-800 font-medium">
+                      {profile[field.name as keyof UserProfile]}
+                    </span>
                   </div>
                 ))}
               </div>
