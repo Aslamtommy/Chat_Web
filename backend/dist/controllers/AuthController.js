@@ -4,12 +4,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const AuthService_1 = __importDefault(require("../services/AuthService"));
-const UserRepository_1 = __importDefault(require("../repositories/UserRepository"));
 class AuthController {
     async register(req, res) {
         try {
             const { username, email, password, age, fathersName, mothersName, phoneNo, place, district, role, } = req.body;
-            // Basic input validation
             if (!username || !email || !password) {
                 res.status(400).json({ success: false, error: 'Username, email, and password are required' });
                 return;
@@ -87,25 +85,15 @@ class AuthController {
             if (!req.user || !req.user.id) {
                 throw new Error('User not authenticated');
             }
-            if (!age || typeof age !== 'number') {
-                throw new Error('Age must be a valid number');
-            }
-            console.log('Received payload:', req.body); // Debug log
-            const updatedUser = await UserRepository_1.default.findById(req.user.id);
-            if (!updatedUser) {
-                throw new Error('User not found');
-            }
-            updatedUser.set({
+            const updatedUser = await AuthService_1.default.updateProfile(req.user.id, {
                 age,
-                fathersName: fathersName || updatedUser.fathersName,
-                mothersName: mothersName || updatedUser.mothersName,
-                phoneNo: phoneNo || updatedUser.phoneNo,
-                place: place || updatedUser.place,
-                district: district || updatedUser.district,
+                fathersName,
+                mothersName,
+                phoneNo,
+                place,
+                district,
             });
-            await updatedUser.save();
-            const { password, ...userWithoutPassword } = updatedUser.toObject();
-            res.json({ success: true, data: userWithoutPassword });
+            res.json({ success: true, data: updatedUser });
         }
         catch (error) {
             console.error('Update profile error:', error.message);

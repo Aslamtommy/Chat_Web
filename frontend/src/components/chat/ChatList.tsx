@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import   { forwardRef } from 'react';
 import ChatMessage from './ChatMessage';
 
 interface Message {

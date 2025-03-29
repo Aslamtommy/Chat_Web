@@ -4,11 +4,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const ChatService_1 = __importDefault(require("../services/ChatService"));
+const StorageService_1 = __importDefault(require("../services/StorageService"));
 class UserChatController {
-    // Get the authenticated user's chat history
     async getMyChatHistory(req, res) {
         try {
-            const userId = req.user.id; // Authenticated user's ID
+            const userId = req.user.id;
             const chat = await ChatService_1.default.getOrCreateChat(userId);
             res.json({ success: true, data: chat });
         }
@@ -16,11 +16,26 @@ class UserChatController {
             res.status(500).json({ success: false, error: error.message });
         }
     }
-    // Send a message to the authenticated user's own chat thread
     async sendMessageToMyChat(req, res) {
         try {
-            const userId = req.user.id; // Authenticated user's ID as both sender and chat owner
-            const { messageType, content } = req.body;
+            const userId = req.user.id;
+            const { messageType } = req.body;
+            let content;
+            if (!messageType)
+                throw new Error('messageType is required');
+            if (!['text', 'image', 'voice'].includes(messageType))
+                throw new Error('Invalid messageType');
+            if (messageType === 'text') {
+                content = req.body.content;
+                if (!content)
+                    throw new Error('content is required for text messages');
+            }
+            else {
+                const file = req.file;
+                if (!file)
+                    throw new Error('File is required for image or voice messages');
+                content = await StorageService_1.default.uploadFile(file, messageType);
+            }
             const updatedChat = await ChatService_1.default.saveMessage(userId, userId, messageType, content);
             res.json({ success: true, data: updatedChat });
         }

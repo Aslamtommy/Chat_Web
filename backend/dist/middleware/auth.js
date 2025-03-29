@@ -9,7 +9,7 @@ exports.default = (req, res, next) => {
     if (!token)
         return res.status(401).json({ error: 'No token provided' });
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, 'mysecret');
         req.user = decoded;
         next();
     }

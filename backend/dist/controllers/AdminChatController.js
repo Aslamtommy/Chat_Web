@@ -4,13 +4,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const ChatService_1 = __importDefault(require("../services/ChatService"));
-const mongoose_1 = __importDefault(require("mongoose"));
+const StorageService_1 = __importDefault(require("../services/StorageService"));
 class AdminChatController {
     async getAllChats(req, res) {
         try {
-            console.log('adminchatcontroll first');
             const chats = await ChatService_1.default.getAllChats();
-            console.log('adminchatcontroll after');
             res.json({ success: true, data: chats });
         }
         catch (error) {
@@ -20,11 +18,6 @@ class AdminChatController {
     async getUserChatHistory(req, res) {
         try {
             const userId = req.params.userId;
-            // Validate userId as a valid ObjectId
-            if (!mongoose_1.default.Types.ObjectId.isValid(userId)) {
-                res.status(400).json({ success: false, error: 'Invalid user ID' });
-                return;
-            }
             const chat = await ChatService_1.default.getOrCreateChat(userId);
             res.json({ success: true, data: chat });
         }
@@ -35,12 +28,24 @@ class AdminChatController {
     async sendMessageToUserChat(req, res) {
         try {
             const userId = req.params.userId;
-            if (!mongoose_1.default.Types.ObjectId.isValid(userId)) {
-                res.status(400).json({ success: false, error: 'Invalid user ID' });
-                return;
-            }
             const senderId = req.user.id;
-            const { messageType, content } = req.body;
+            const { messageType } = req.body;
+            let content;
+            if (!messageType)
+                throw new Error('messageType is required');
+            if (!['text', 'image', 'voice'].includes(messageType))
+                throw new Error('Invalid messageType');
+            if (messageType === 'text') {
+                content = req.body.content;
+                if (!content)
+                    throw new Error('content is required for text messages');
+            }
+            else {
+                const file = req.file;
+                if (!file)
+                    throw new Error('File is required for image or voice messages');
+                content = await StorageService_1.default.uploadFile(file, messageType === 'image' ? 'image' : 'audio');
+            }
             const updatedChat = await ChatService_1.default.saveMessage(userId, senderId, messageType, content);
             res.json({ success: true, data: updatedChat });
         }

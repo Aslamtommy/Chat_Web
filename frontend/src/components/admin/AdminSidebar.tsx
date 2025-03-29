@@ -29,7 +29,7 @@ useEffect(() => {
   const token = localStorage.getItem('adminToken');
   if (!token) return;
 
-  socketRef.current = io('http://localhost:5000', {
+  socketRef.current = io('https://chat-web-1ud8.onrender.com ', {
     auth: { token },
   });
 

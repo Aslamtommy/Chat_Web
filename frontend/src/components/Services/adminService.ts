@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/admin';
+const API_URL = 'https://chat-web-1ud8.onrender.com/admin ';
 
 const adminService = {
   adminLogin: async (data: { email: string; password: string }) => {

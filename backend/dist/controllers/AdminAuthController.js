@@ -4,15 +4,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const AuthService_1 = __importDefault(require("../services/AuthService"));
-const User_1 = __importDefault(require("../models/User"));
+const UserRepository_1 = __importDefault(require("../repositories/UserRepository"));
 class AdminAuthController {
     async adminLogin(req, res) {
         try {
             const { email, password } = req.body;
+            if (!email || !password)
+                throw new Error('Email and password are required');
             const { token, user } = await AuthService_1.default.login(email, password);
-            if (user.role !== 'admin') {
+            if (user.role !== 'admin')
                 throw new Error('Only admins can use this endpoint');
-            }
             res.json({ success: true, data: { token, user } });
         }
         catch (error) {
@@ -21,7 +22,7 @@ class AdminAuthController {
     }
     async getUsers(req, res) {
         try {
-            const users = await User_1.default.find().select('-password');
+            const users = await UserRepository_1.default.findAll();
             res.json({ success: true, data: users });
         }
         catch (error) {
@@ -30,8 +31,7 @@ class AdminAuthController {
     }
     async getUserById(req, res) {
         try {
-            const user = await User_1.default.findById(req.params.id).select('-password');
-            console.log(user);
+            const user = await UserRepository_1.default.findById(req.params.id);
             if (!user) {
                 res.status(404).json({ success: false, error: 'User not found' });
                 return;

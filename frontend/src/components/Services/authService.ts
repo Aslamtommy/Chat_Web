@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/auth'; // Replace with your backend URL
+const API_URL = 'https://chat-web-1ud8.onrender.com/auth' ; // Replace with your backend URL
 
 const authService = {
   register: async (data: {

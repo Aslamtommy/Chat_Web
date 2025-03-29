@@ -71,7 +71,7 @@ const Home = () => {
       return;
     }
 
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io('https://chat-web-1ud8.onrender.com ', {
       auth: { token },
       reconnection: true,
       reconnectionAttempts: 5,

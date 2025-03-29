@@ -36,7 +36,7 @@ class AuthService {
         if (!(await bcryptjs_1.default.compare(password, user.password))) {
             throw new Error('Incorrect password');
         }
-        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+        const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, 'mysecret', {
             expiresIn: '1h', // Add token expiration for security
         });
         return { token, user };
@@ -45,7 +45,38 @@ class AuthService {
         const user = await UserRepository_1.default.findById(id);
         if (!user)
             return null;
-        const { password, ...userWithoutPassword } = user.toObject();
+        return user;
+    }
+    // In AuthService.ts
+    async updateProfile(userId, profileData) {
+        // Convert age to number if it exists and is a string
+        if (profileData.age) {
+            const ageAsNumber = Number(profileData.age);
+            // Validate the number
+            if (isNaN(ageAsNumber) || ageAsNumber <= 0) {
+                throw new Error('Age must be a valid number');
+            }
+            // Assign the converted value
+            profileData.age = ageAsNumber;
+        }
+        // Fetch the existing user
+        const existingUser = await UserRepository_1.default.findById(userId);
+        if (!existingUser) {
+            throw new Error('User not found');
+        }
+        const updateData = {
+            age: profileData.age,
+            fathersName: profileData.fathersName || existingUser.fathersName,
+            mothersName: profileData.mothersName || existingUser.mothersName,
+            phoneNo: profileData.phoneNo || existingUser.phoneNo,
+            place: profileData.place || existingUser.place,
+            district: profileData.district || existingUser.district,
+        };
+        const updatedUser = await UserRepository_1.default.updateById(userId, updateData);
+        if (!updatedUser) {
+            throw new Error('Failed to update user');
+        }
+        const { password, ...userWithoutPassword } = updatedUser.toObject();
         return userWithoutPassword;
     }
 }
