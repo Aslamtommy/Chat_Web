@@ -10,7 +10,7 @@ class ChatService {
     return chat;
   }
 
-  async saveMessage(userId: string, senderId: any, messageType: 'text' | 'image', content: string): Promise<IChatThread> {
+  async saveMessage(userId: string, senderId: any, messageType: 'text' | 'image' | 'voice', content: string): Promise<IChatThread> {
     const message: IMessage = { sender_id: senderId, message_type: messageType, content, timestamp: new Date() };
     return ChatRepository.addMessage(userId, message);
   }

@@ -1,6 +1,6 @@
+// controllers/AuthController.ts
 import { Request, Response } from 'express';
 import AuthService from '../services/AuthService';
-import UserRepository from '../repositories/UserRepository';
 
 class AuthController {
   async register(req: Request, res: Response): Promise<void> {
@@ -18,7 +18,6 @@ class AuthController {
         role,
       } = req.body;
 
-      // Basic input validation
       if (!username || !email || !password) {
         res.status(400).json({ success: false, error: 'Username, email, and password are required' });
         return;
@@ -93,25 +92,17 @@ class AuthController {
       if (!req.user || !req.user.id) {
         throw new Error('User not authenticated');
       }
-      if (!age || typeof age !== 'number') {
-        throw new Error('Age must be a valid number');
-      }
-      console.log('Received payload:', req.body); // Debug log
-      const updatedUser = await UserRepository.findById(req.user.id);
-      if (!updatedUser) {
-        throw new Error('User not found');
-      }
-      updatedUser.set({
+ 
+      const updatedUser = await AuthService.updateProfile(req.user.id, {
         age,
-        fathersName: fathersName || updatedUser.fathersName,
-        mothersName: mothersName || updatedUser.mothersName,
-        phoneNo: phoneNo || updatedUser.phoneNo,
-        place: place || updatedUser.place,
-        district: district || updatedUser.district,
+        fathersName,
+        mothersName,
+        phoneNo,
+        place,
+        district,
       });
-      await updatedUser.save();
-      const { password, ...userWithoutPassword } = updatedUser.toObject();
-      res.json({ success: true, data: userWithoutPassword });
+
+      res.json({ success: true, data: updatedUser });
     } catch (error) {
       console.error('Update profile error:', (error as Error).message);
       res.status(400).json({ success: false, error: (error as Error).message });

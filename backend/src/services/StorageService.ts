@@ -27,20 +27,29 @@ class StorageService {
         throw new Error('Cloudinary configuration is missing');
       }
 
-      const timestamp = Math.floor(Date.now() / 1000); // Current timestamp in seconds
+      const timestamp = Math.floor(Date.now() / 1000);
       const publicId = `${timestamp}-${file.originalname}`;
       const folder = type === 'image' ? 'arabic-jyothisham' : 'arabic-jyothisham/audio';
 
-      // Corrected string to sign: key=value pairs separated by &, followed by API secret
-      const stringToSign = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}${process.env.CLOUDINARY_API_SECRET}`;
+      // Corrected string to sign: key=value pairs sorted alphabetically, joined with &, followed by API secret
+      const paramsToSign = {
+        folder,
+        public_id: publicId,
+        timestamp,
+      };
+      const sortedParams = Object.keys(paramsToSign)
+        .sort()
+        .map((key) => `${key}=${paramsToSign[key as keyof typeof paramsToSign]}`)
+        .join('&');
+      const stringToSign = `${sortedParams}${process.env.CLOUDINARY_API_SECRET}`;
       const signature = createHash('sha1').update(stringToSign).digest('hex');
 
       const uploadParams: UploadApiOptions = {
         folder,
         public_id: publicId,
         timestamp,
-        api_key: process.env.CLOUDINARY_API_KEY,
         signature,
+        api_key: process.env.CLOUDINARY_API_KEY,
         resource_type: type === 'image' ? 'image' : 'video', // Audio files are treated as 'video' in Cloudinary
       };
 

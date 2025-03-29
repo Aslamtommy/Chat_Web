@@ -1,4 +1,5 @@
-import { Types,Document } from 'mongoose';
+import { Types, Document } from 'mongoose';
+import mongoose from 'mongoose';
 export interface IUser extends Document {
   username: string;
   email: string;
@@ -13,8 +14,9 @@ export interface IUser extends Document {
 }
 
 export interface IMessage {
+  _id?: mongoose.Types.ObjectId;
   sender_id: Types.ObjectId;
-  message_type: 'text' | 'image';
+  message_type: 'text' | 'image' | 'voice';
   content: string;
   timestamp: Date;
 }

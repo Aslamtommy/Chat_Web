@@ -6,38 +6,43 @@ export default {
   ],
   theme: {
     extend: {
-      fontFamily: {
-        cinzel: ['Cinzel', 'serif'],
-        sans: ['Inter', 'sans-serif'],
-      },
       colors: {
-        primary: {
-          DEFAULT: '#1e3a8a',
-          dark: '#1e3a8a',
-          light: '#4f46e5',
-        },
-        secondary: {
-          DEFAULT: '#d4af37',
-          dark: '#b45309',
-          light: '#f59e0b',
-        },
-        accent: {
-          DEFAULT: '#f3f4f6',
-          dark: '#e5e7eb',
-        },
-        text: {
-          DEFAULT: '#1f2937',
-          muted: '#6b7280',
-        },
+        'chat-bg': '#F4F4F6',              // Light gray background for chat pages
+        'text-primary': '#1F2937',         // Dark charcoal for primary text
+        'text-secondary': '#4B5563',       // Softer gray for secondary text
+        'header-bg': '#FFFFFF',            // White for header and footer backgrounds
+        'primary-light': '#93C5FD',        // Lighter blue for hover states
+        'text-muted': '#9CA3AF',           // Muted gray for placeholder/timestamps
+        'success': '#16A34A',              // Green for success badges
+        'error': '#DC2626',                // Red for errors
+        'warning': '#F59E0B',              // Orange for warnings
+        'gray-50': '#F9FAFB',              // Ultra-light gray for subtle contrast
       },
       boxShadow: {
-        'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        'deep': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        'soft': '0 2px 8px rgba(0, 0, 0, 0.08)',    // Soft shadow for subtle elevation
+        'deep': '0 6px 18px rgba(0, 0, 0, 0.12)',   // Deeper shadow for modals and cards
+        'message': '0 3px 10px rgba(0, 0, 0, 0.06)', // Shadow for chat bubbles
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        poppins: ['Poppins', 'sans-serif'],
+        roboto: ['Roboto', 'sans-serif'],
+        cinzel: ['Cinzel', 'serif'],
       },
       borderRadius: {
-        'xl': '1rem',
+        'message': '1rem',
+        'btn': '0.6rem',
+        'card': '1.2rem',
+      },
+      transitionProperty: {
+        'height': 'height',
+        'spacing': 'margin, padding',
+        'opacity': 'opacity',
+      },
+      spacing: {
+        '18': '4.5rem',
       },
     },
   },
-  plugins: [],
+  plugins: [require("tailwindcss-animate")],
 };

@@ -1,16 +1,15 @@
 // controllers/AdminAuthController.ts
 import { Request, Response } from 'express';
 import AuthService from '../services/AuthService';
-import User from '../models/User';
+import UserRepository from '../repositories/UserRepository';
 
 class AdminAuthController {
   async adminLogin(req: Request, res: Response): Promise<void> {
     try {
       const { email, password } = req.body;
+      if (!email || !password) throw new Error('Email and password are required');
       const { token, user } = await AuthService.login(email, password);
-      if (user.role !== 'admin') {
-        throw new Error('Only admins can use this endpoint');
-      }
+      if (user.role !== 'admin') throw new Error('Only admins can use this endpoint');
       res.json({ success: true, data: { token, user } });
     } catch (error) {
       res.status(401).json({ success: false, error: (error as Error).message });
@@ -19,8 +18,7 @@ class AdminAuthController {
 
   async getUsers(req: Request, res: Response): Promise<void> {
     try {
-      const users = await User.find().select('-password');
-   
+      const users = await UserRepository.findAll();
       res.json({ success: true, data: users });
     } catch (error) {
       res.status(500).json({ success: false, error: (error as Error).message });
@@ -29,8 +27,9 @@ class AdminAuthController {
 
   async getUserById(req: Request, res: Response): Promise<void> {
     try {
-      const user = await User.findById(req.params.id).select('-password');
-      console.log(user )
+      const user = await UserRepository.findById(req.params.id);
+
+    
       if (!user) {
         res.status(404).json({ success: false, error: 'User not found' });
         return;
