@@ -23,7 +23,7 @@ const app: Express = express();
 const server = http.createServer(app); // Create an HTTP server for Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: 'https://chat-web-beryl-seven.vercel.app', // Match your frontend URL
+    origin: 'https://chat-web-beige.vercel.app', // Match your frontend URL
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   },
@@ -31,13 +31,13 @@ const io = new Server(server, {
 
 // Middleware
 app.options('*', cors({
-  origin: 'https://chat-web-beryl-seven.vercel.app',
+  origin: 'https://chat-web-beige.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(cors({  
-  origin: 'https://chat-web-beryl-seven.vercel.app',
+  origin: 'https://chat-web-beige.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
