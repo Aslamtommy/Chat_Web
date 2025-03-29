@@ -1,4 +1,3 @@
-// src/components/Pages/Home.tsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChatHeader from '../chat/ChatHeader';
@@ -16,6 +15,7 @@ interface Message {
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   duration?: number;
   timestamp?: string;
+  senderId?: string;
 }
 
 const Home = () => {
@@ -26,43 +26,43 @@ const Home = () => {
   const socketRef = useRef<any>(null);
   const navigate = useNavigate();
   const pendingMessages = useRef<Set<string>>(new Set());
-
-  const isNearBottom = useCallback(() => {
-    if (!chatContainerRef.current) return false;
-    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-    return scrollHeight - scrollTop - clientHeight < 100;
-  }, []);
+  const userId = useRef<string | null>(null);
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, []);
 
   const handleNewMessage = useCallback((message: Message) => {
-    setMessages(prev => {
-      if (prev.some(m => m._id === message._id && m.timestamp === message.timestamp)) return prev;
-      return [...prev, { ...message, status: 'delivered' }];
+    if (message.senderId === userId.current) return;
+
+    setMessages((prev: Message[]): Message[] => {
+      if (prev.some((m) => m._id === message._id)) return prev;
+      const updatedMessages = [...prev, { ...message, status: 'delivered' as const }];
+      scrollToBottom();
+      return updatedMessages;
     });
-    if (isNearBottom()) scrollToBottom();
-  }, [isNearBottom, scrollToBottom]);
+  }, [scrollToBottom]);
 
   const handleMessageDelivered = useCallback((message: Message) => {
-    setMessages(prev => prev.map(msg => 
-      msg._id === message._id ? { ...msg, status: 'delivered' } : msg
-    ));
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg._id === message._id ? { ...msg, ...message, status: 'delivered' } : msg
+      )
+    );
   }, []);
 
-  const handleMessageError = useCallback(({ tempId, error }: { tempId: string, error: string }) => {
-    console.error('Message error:', error);
-    setMessages(prev => prev.map(msg => 
-      msg._id === tempId ? { ...msg, status: 'failed' } : msg
-    ));
-    pendingMessages.current.delete(tempId);
-  }, []);
+  const handleMessageError = useCallback(
+    ({ tempId, error }: { tempId: string; error: string }) => {
+      console.error('Message error:', error);
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
+      );
+      pendingMessages.current.delete(tempId);
+    },
+    []
+  );
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -71,14 +71,18 @@ const Home = () => {
       return;
     }
 
-    socketRef.current = io('https://chat-web-1ud8.onrender.com', {
+    socketRef.current = io('http://localhost:5000', {
       auth: { token },
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
 
-    socketRef.current.on('connect', () => console.log('Connected to Socket.IO server'));
+    socketRef.current.on('connect', () => {
+      console.log('Connected to Socket.IO server');
+      const decoded = jwtDecode<{ id: string }>(token);
+      userId.current = decoded.id;
+    });
     socketRef.current.on('newMessage', handleNewMessage);
     socketRef.current.on('messageDelivered', handleMessageDelivered);
     socketRef.current.on('messageError', handleMessageError);
@@ -91,11 +95,12 @@ const Home = () => {
           content: msg.content,
           isAdmin: msg.sender_id.toString() !== chat.user_id.toString(),
           messageType: msg.message_type,
-          status: 'delivered',
+          status: 'delivered' as const,
+          senderId: msg.sender_id.toString(),
           timestamp: msg.timestamp,
         }));
         setMessages(formattedMessages);
-        setTimeout(scrollToBottom, 100);
+        scrollToBottom();
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
       }
@@ -110,49 +115,60 @@ const Home = () => {
     };
   }, [navigate, handleNewMessage, handleMessageDelivered, handleMessageError, scrollToBottom]);
 
-  const handleSend = useCallback(async (
-    messageType: 'text' | 'image' | 'voice',
-    content: string | File,
-    duration?: number
-  ) => {
-    if (!socketRef.current) return;
+  const handleSend = useCallback(
+    async (messageType: 'text' | 'image' | 'voice', content: string | File, duration?: number) => {
+      if (!socketRef.current) return;
 
-    const tempId = Date.now().toString();
-    const tempMessage: Message = {
-      _id: tempId,
-      content: messageType === 'text' ? (content as string) : 'Uploading...',
-      isAdmin: false,
-      messageType,
-      status: 'sending',
-      duration,
-      timestamp: new Date().toISOString(),
-    };
+      const tempId = Date.now().toString();
+      const tempMessage: Message = {
+        _id: tempId,
+        content: messageType === 'text' ? (content as string) : 'Uploading...',
+        isAdmin: false,
+        messageType,
+        status: 'sending',
+        senderId: userId.current || '',
+        duration,
+        timestamp: new Date().toISOString(),
+      };
 
-    pendingMessages.current.add(tempId);
-    setMessages(prev => [...prev, tempMessage]);
-    scrollToBottom();
+      pendingMessages.current.add(tempId);
+      setMessages((prev) => [...prev, tempMessage]);
+      scrollToBottom();
 
-    try {
-      let finalContent = content;
-      if (messageType !== 'text') {
-        const response = await chatService.sendMessage(messageType, content);
-        finalContent = response.messages[response.messages.length - 1].content;
-      }
-
-      socketRef.current.emit('sendMessage', { messageType, content: finalContent, tempId }, (ack: { status: string, message?: Message }) => {
-        pendingMessages.current.delete(tempId);
-        if (ack?.status === 'success' && ack.message) {
-          setMessages(prev => prev.map(msg =>
-            msg._id === tempId ? { ...msg, _id: ack.message!._id, content: ack.message!.content, status: 'delivered', timestamp: ack.message!.timestamp } : msg
-          ));
+      try {
+        let finalContent = content;
+        if (messageType !== 'text') {
+          const response = await chatService.sendMessage(messageType, content);
+          finalContent = response.messages[response.messages.length - 1].content;
         }
-      });
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      setMessages(prev => prev.map(msg => msg._id === tempId ? { ...msg, status: 'failed' } : msg));
-      pendingMessages.current.delete(tempId);
-    }
-  }, [scrollToBottom]);
+
+        socketRef.current.emit(
+          'sendMessage',
+          { messageType, content: finalContent, tempId },
+          (ack: { status: string; message?: Message }) => {
+            pendingMessages.current.delete(tempId);
+            if (ack?.status === 'success' && ack.message) {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg._id === tempId
+                    ? { ...msg, ...ack.message, status: 'delivered' }
+                    : msg
+                )
+              );
+              scrollToBottom();
+            }
+          }
+        );
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        setMessages((prev) =>
+          prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
+        );
+        pendingMessages.current.delete(tempId);
+      }
+    },
+    [scrollToBottom]
+  );
 
   const handleTabChange = (tab: 'chats' | 'files' | 'profile') => {
     setActiveTab(tab);
@@ -162,14 +178,14 @@ const Home = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 font-sans">
-      {/* Enhanced Header */}
       <ChatHeader />
-
-      {/* Main Content */}
       <div className="flex-1 flex flex-col bg-white rounded-t-3xl shadow-lg overflow-hidden mx-4 mb-4 mt-2">
         {activeTab === 'chats' && (
           <>
-            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white" ref={chatContainerRef}>
+            <div
+              className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white"
+              ref={chatContainerRef}
+            >
               <ChatList messages={messages} />
             </div>
             <div className="border-t border-gray-200 bg-white">
@@ -178,17 +194,13 @@ const Home = () => {
           </>
         )}
       </div>
-
-      {/* Profile Modal */}
-      <ProfileModal 
-        isOpen={isProfileModalOpen} 
+      <ProfileModal
+        isOpen={isProfileModalOpen}
         onClose={() => {
           setIsProfileModalOpen(false);
           setActiveTab('chats');
-        }} 
+        }}
       />
-
-      {/* Elegant Bottom Navigation */}
       <div className="flex justify-around py-3 px-6 bg-white border-t border-gray-200 shadow-md rounded-b-xl mx-4 mb-4">
         {[
           { id: 'chats', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: 'Chats' },
@@ -212,5 +224,17 @@ const Home = () => {
     </div>
   );
 };
+
+function jwtDecode<T>(token: string): T {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(
+    atob(base64)
+      .split('')
+      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+      .join('')
+  );
+  return JSON.parse(jsonPayload);
+}
 
 export default Home;

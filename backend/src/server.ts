@@ -8,9 +8,10 @@ import authRoutes from './routes/auth';
 import chatRoutes from './routes/chat';
 import uploadRoutes from './routes/upload';
 import adminRoutes from './routes/adminRoutes';
-import ChatService from './services/ChatService'; // Import ChatService for real-time message handling
+import ChatService from './services/ChatService';
 import dotenv from 'dotenv';
 import ChatRepository from './repositories/ChatRepository';
+
 declare module 'express' {
   export interface Request {
     user?: { id: string; role: string };
@@ -20,47 +21,31 @@ declare module 'express' {
 dotenv.config();
 
 const app: Express = express();
-const server = http.createServer(app); // Create an HTTP server for Socket.IO
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: 'https://chat-web-beige.vercel.app', // Match your frontend URL
+    origin: 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   },
 });
 
-// Middleware
-app.options('*', cors({
-  origin: 'https://chat-web-beige.vercel.app',
+app.use(cors({
+  origin: 'http://localhost:5173',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
-app.use(cors({  
-  origin: 'https://chat-web-beige.vercel.app',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
 app.use(express.json({ limit: '10mb' }));
 
-// Test endpoint
-app.get('/test', (req: Request, res: Response) => {
-  res.json({ message: 'CORS test' });
-});
-
-// Routes
 app.use('/auth', authRoutes);
 app.use('/chat', chatRoutes);
 app.use('/upload', uploadRoutes);
 app.use('/admin', adminRoutes);
 
 app.get('/', (req: Request, res: Response) => {
-  console.log('GET / accessed');
   res.send('Backend is running');
 });
 
-// MongoDB Connection
 const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 if (!mongoUri) {
   console.error('Error: MONGODB_URI is not defined in environment variables');
@@ -74,7 +59,6 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
-// Socket.IO Authentication Middleware
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error('Authentication error: No token provided'));
@@ -94,7 +78,58 @@ io.on('connection', (socket) => {
   const isAdmin = socket.data.user.role === 'admin';
   
   socket.join(userId);
-  if (isAdmin) socket.join('admin-room');
+  if (isAdmin) {
+    socket.join('admin-room');
+    console.log(`Admin ${userId} joined admin-room`);
+    console.log(`Triggering initial sync for admin ${userId}`);
+    socket.emit('requestSyncUnreadCounts');
+  }
+
+  if (isAdmin) {
+    socket.on('syncUnreadCounts', async () => {
+      try {
+        console.log(`Syncing unread counts for admin ${userId}`);
+        const allUsers = await mongoose.model('User').find({ role: 'user' });
+        const unreadCounts: { [key: string]: number } = {};
+        for (const user of allUsers) {
+          const uid = user._id.toString();
+          const count = await ChatRepository.getUnreadCount(uid);
+          unreadCounts[uid] = count;
+          console.log(`Calculated unread count for ${uid}: ${count}`);
+        }
+        console.log('Sending initial unread counts on sync:', unreadCounts);
+        socket.emit('initialUnreadCounts', unreadCounts);
+      } catch (error) {
+        console.error('Error syncing unread counts:', error);
+      }
+    });
+  }
+
+  socket.on('markMessagesAsRead', async ({ chatId }) => {
+    try {
+      if (!isAdmin) {
+        console.log(`Non-admin ${userId} attempted to mark messages as read`);
+        return;
+      }
+      
+      console.log(`Received markMessagesAsRead event for chat ${chatId} by admin ${userId}`);
+      await ChatRepository.markMessagesAsRead(chatId, userId);
+      
+      const unreadCount = await ChatRepository.getUnreadCount(chatId);
+      console.log(`Updated unread count for ${chatId} after markMessagesAsRead: ${unreadCount}`);
+      io.to('admin-room').emit('updateUnreadCount', {
+        userId: chatId,
+        unreadCount,
+      });
+      io.to(chatId).emit('messagesRead', { 
+        chatId,
+        readBy: userId,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  });
 
   socket.on('sendMessage', async ({ targetUserId, messageType, content, tempId }, ack) => {
     try {
@@ -112,11 +147,12 @@ io.on('connection', (socket) => {
         recipientId = admin._id.toString();
       }
 
-      const chatThreadId = isAdmin ? targetUserId : recipientId;
-      
-      // Check for duplicate message
+      const chatThreadId = isAdmin ? targetUserId : senderId;
+      console.log(`Message from ${senderId} (${isAdmin ? 'admin' : 'user'}) to ${recipientId}`);
+
       const existingMessage = await ChatRepository.findMessageByContent(chatThreadId, content);
       if (existingMessage) {
+        console.log(`Duplicate message detected for chat ${chatThreadId}: ${content}`);
         socket.emit('messageError', { tempId, error: 'Duplicate message detected' });
         return ack?.({ status: 'error', error: 'Duplicate message' });
       }
@@ -129,10 +165,11 @@ io.on('connection', (socket) => {
       );
 
       const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
-      if(newMessage._id ==undefined){
-        console.log('newMessage._id is undefined');
+      if (!newMessage._id) {
+        console.log('Message not saved properly');
         return ack?.({ status: 'error', error: 'Message not saved' });
       }
+
       const messagePayload = {
         _id: newMessage._id.toString(),
         chatId: updatedChat._id.toString(),
@@ -140,30 +177,23 @@ io.on('connection', (socket) => {
         content: newMessage.content,
         messageType: newMessage.message_type,
         timestamp: newMessage.timestamp,
-        status: 'delivered'
+        status: 'delivered',
+        isAdmin: isAdmin,
+        read: false,
       };
 
-      const recipientRoom = isAdmin ? targetUserId : 'admin-room';
-      
-      // Prevent duplicate emission with once handler
-      io.to(recipientRoom).emit('newMessage', {
-        ...messagePayload,
-        isAdmin: isAdmin
-      });
-
-      socket.emit('messageDelivered', {
-        ...messagePayload,
-        isAdmin: senderRole === 'admin',
-        status: 'delivered'
-      });
-
-      // Enhanced admin notification
-      if (!isAdmin) {
-        io.to('admin-room').emit('newUserMessage', { 
+      if (isAdmin) {
+        io.to(targetUserId).emit('newMessage', messagePayload);
+        socket.emit('messageDelivered', messagePayload);
+      } else {
+        io.to('admin-room').emit('newMessage', messagePayload);
+        const unreadCount = await ChatRepository.getUnreadCount(senderId);
+        console.log(`Emitting updateUnreadCount for user ${senderId}: ${unreadCount}`);
+        io.to('admin-room').emit('updateUnreadCount', {
           userId: senderId,
-          message: messagePayload,
-          timestamp: new Date().toISOString()
+          unreadCount,
         });
+        socket.emit('messageDelivered', messagePayload);
       }
 
       ack?.({ status: 'success', message: messagePayload });
@@ -176,14 +206,21 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${userId}`);
+    if (isAdmin) {
+      console.log(`Admin ${userId} left admin-room`);
+    }
+  });
+
+  // Log all incoming events for debugging
+  socket.onAny((eventName, ...args) => {
+    console.log(`Received event: ${eventName}`, args);
   });
 });
- 
-// Start Server
+
 const port = process.env.PORT || 5000;
 server.listen(port, () => {
   console.log(`Server started on port ${port} with HTTP and Socket.IO`);
 });
 
 export default app;
-export { io }; // Export io for potential use in controllers or services
+export { io };

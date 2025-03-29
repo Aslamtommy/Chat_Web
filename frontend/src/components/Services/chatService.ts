@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://chat-web-1ud8.onrender.com/chat';
+const API_URL = 'http://localhost:5000/chat';
 
 const chatService = {
   getChatHistory: async () => {

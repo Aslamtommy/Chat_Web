@@ -1,5 +1,6 @@
 import ChatRepository from '../repositories/ChatRepository';
 import { IChatThread, IMessage } from '../types';
+import mongoose from 'mongoose';
 
 class ChatService {
   async getOrCreateChat(userId: string): Promise<IChatThread> {
@@ -10,9 +11,15 @@ class ChatService {
     return chat;
   }
 
-  async saveMessage(userId: string, senderId: any, messageType: 'text' | 'image' | 'voice', content: string): Promise<IChatThread> {
-    const message: IMessage = { sender_id: senderId, message_type: messageType, content, timestamp: new Date() };
-    return ChatRepository.addMessage(userId, message);
+  async saveMessage(chatThreadId: string, senderId: any, messageType: 'text' | 'image' | 'voice', content: string): Promise<IChatThread> {
+    const message: IMessage = {
+      sender_id: new mongoose.Types.ObjectId(senderId), // Ensure ObjectId
+      message_type: messageType,
+      content,
+      timestamp: new Date(),
+      read_by_admin: false, // Explicitly set to false
+    };
+    return ChatRepository.addMessage(chatThreadId, message);
   }
 
   async getAllChats(): Promise<IChatThread[]> {

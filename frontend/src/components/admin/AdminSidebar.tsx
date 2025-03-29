@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import  io  from 'socket.io-client';
+import { useState, useEffect } from 'react';
+import { Socket } from 'socket.io-client';
 import adminService from '../Services/adminService';
 
 interface User {
@@ -8,85 +8,103 @@ interface User {
   role: string;
   lastMessageTimestamp?: string | null;
   hasNewMessages?: boolean;
+  unreadCount?: number;
 }
 
 interface AdminSidebarProps {
   onSelectUser: (userId: string) => void;
   selectedUserId: string | null;
+  socket: any;
 }
 
-const AdminSidebar = ({ onSelectUser, selectedUserId }: AdminSidebarProps) => {
+const AdminSidebar = ({ onSelectUser, selectedUserId, socket }: AdminSidebarProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [lastReadTimestamps, setLastReadTimestamps] = useState<{ [key: string]: string | null }>(() => {
-    const saved = localStorage.getItem('lastReadTimestamps');
-    return saved ? JSON.parse(saved) : {};
-  });
-  const socketRef = useRef<any>(null); // Properly type socketRef
 
- // AdminSidebar.tsx (relevant part)
-useEffect(() => {
-  const token = localStorage.getItem('adminToken');
-  if (!token) return;
-
-  socketRef.current = io('https://chat-web-1ud8.onrender.com', {
-    auth: { token },
-  });
-
-  socketRef.current.on('newUserMessage', ({ userId }: { userId: string }) => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user._id === userId && user._id !== selectedUserId
-          ? { ...user, hasNewMessages: true, lastMessageTimestamp: new Date().toISOString() } // Update timestamp
-          : user
-      )
-    );
-  });
-
-  const fetchUsers = async () => {
+  const fetchUserListAndCounts = async () => {
     try {
       const userList = await adminService.getAllUsers();
+      const unreadCounts = await adminService.getUnreadCounts();
+      console.log('Initial unread counts from API:', unreadCounts);
       setUsers(
-        userList.map((user: User) => {
-          const lastRead = lastReadTimestamps[user._id];
-          const lastMessageTime = user.lastMessageTimestamp ? new Date(user.lastMessageTimestamp) : null;
-          const lastReadTime = lastRead ? new Date(lastRead) : null;
-          const hasNewMessages = lastMessageTime && (!lastReadTime || lastMessageTime > lastReadTime);
-
-          return {
-            ...user,
-            hasNewMessages: Boolean(hasNewMessages),
-          };
-        })
+        userList.map((user) => ({
+          ...user,
+          unreadCount: unreadCounts[user._id] || 0,
+          hasNewMessages: (unreadCounts[user._id] || 0) > 0,
+        }))
       );
     } catch (error) {
-      console.error('Failed to fetch users:', error);
+      console.error('Failed to load users or unread counts:', error);
     }
   };
-  fetchUsers();
-
-  return () => {
-    socketRef.current?.disconnect();
-  };
-}, [lastReadTimestamps, selectedUserId]);
 
   useEffect(() => {
-    localStorage.setItem('lastReadTimestamps', JSON.stringify(lastReadTimestamps));
-  }, [lastReadTimestamps]);
+    fetchUserListAndCounts();
 
-  const handleUserClick = (userId: string) => {
-    onSelectUser(userId);
-    setIsSidebarOpen(false);
-    setLastReadTimestamps((prev) => ({
-      ...prev,
-      [userId]: new Date().toISOString(),
-    }));
-    setUsers((prevUsers) =>
-      prevUsers.map((user) =>
-        user._id === userId ? { ...user, hasNewMessages: false } : user
-      )
-    );
+    socket.on('initialUnreadCounts', (counts: { [userId: string]: number }) => {
+      console.log('Received initial unread counts from socket:', counts);
+      setUsers((prev) =>
+        prev.map((user) => ({
+          ...user,
+          unreadCount: counts[user._id] || 0,
+          hasNewMessages: (counts[user._id] || 0) > 0,
+        }))
+      );
+    });
+
+    socket.on('requestSyncUnreadCounts', () => {
+      console.log('Received request to sync unread counts');
+      socket.emit('syncUnreadCounts');
+    });
+
+    socket.on('updateUnreadCount', ({ userId, unreadCount }: { userId: string; unreadCount: number }) => {
+      console.log(`Received updateUnreadCount: userId=${userId}, unreadCount=${unreadCount}`);
+      if (userId !== selectedUserId) {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user._id === userId
+              ? {
+                  ...user,
+                  unreadCount,
+                  hasNewMessages: unreadCount > 0,
+                  lastMessageTimestamp: new Date().toISOString(),
+                }
+              : user
+          )
+        );
+      }
+    });
+
+    return () => {
+      socket.off('initialUnreadCounts');
+      socket.off('requestSyncUnreadCounts');
+      socket.off('updateUnreadCount');
+    };
+  }, [socket, selectedUserId]);
+
+  const handleUserClick = async (userId: string) => {
+    console.log(`User clicked: ${userId}, marking messages as read`);
+    try {
+      await adminService.markMessagesAsRead(userId); // Call the new endpoint
+      setUsers((prev) =>
+        prev.map((user) =>
+          user._id === userId
+            ? { ...user, unreadCount: 0, hasNewMessages: false }
+            : user
+        )
+      );
+      socket.emit('markMessagesAsRead', { chatId: userId }); // Keep socket event for real-time updates
+      onSelectUser(userId);
+    } catch (error) {
+      console.error('Failed to mark messages as read:', error);
+    }
   };
+
+  const sortedUsers = [...users].sort((a, b) => {
+    const timeA = a.lastMessageTimestamp ? new Date(a.lastMessageTimestamp).getTime() : 0;
+    const timeB = b.lastMessageTimestamp ? new Date(b.lastMessageTimestamp).getTime() : 0;
+    return timeB - timeA;
+  });
 
   return (
     <>
@@ -111,7 +129,7 @@ useEffect(() => {
           />
         </div>
         <div className="space-y-2">
-          {users.map((user) => (
+          {sortedUsers.map((user) => (
             <div
               key={user._id}
               onClick={() => handleUserClick(user._id)}
@@ -137,9 +155,11 @@ useEffect(() => {
                   )}
                 </div>
               </div>
-              {user.hasNewMessages && selectedUserId !== user._id && (
+              {user.unreadCount && user.unreadCount > 0 && selectedUserId !== user._id && (
                 <div className="flex items-center">
-                  <span className="w-3 h-3 bg-accent rounded-full animate-pulse" />
+                  <span className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">
+                    {user.unreadCount}
+                  </span>
                 </div>
               )}
             </div>

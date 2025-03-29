@@ -1,7 +1,7 @@
 // src/services/profileService.ts
 import axios from 'axios';
 
-const API_URL = 'https://chat-web-1ud8.onrender.com/auth';
+const API_URL = 'http://localhost:5000/auth';
 
 const profileService = {
   getProfile: async () => {

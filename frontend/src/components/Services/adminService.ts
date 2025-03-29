@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://chat-web-1ud8.onrender.com/admin';
+const API_URL = 'http://localhost:5000/admin';
 
 const adminService = {
   adminLogin: async (data: { email: string; password: string }) => {
@@ -17,7 +17,6 @@ const adminService = {
     });
     if (!response.data.success) throw new Error(response.data.error || 'Failed to fetch users');
 
-    // Fetch last message timestamp for each user
     const users = response.data.data;
     const usersWithLastMessage = await Promise.all(
       users.map(async (user: any) => {
@@ -34,7 +33,6 @@ const adminService = {
       })
     );
 
-    // Sort users by last message timestamp (most recent first)
     return usersWithLastMessage.sort((a: any, b: any) => {
       if (!a.lastMessageTimestamp) return 1;
       if (!b.lastMessageTimestamp) return -1;
@@ -82,6 +80,26 @@ const adminService = {
     });
 
     if (!response.data.success) throw new Error(response.data.error || 'Failed to send message');
+    return response.data.data;
+  },
+
+  getUnreadCounts: async (): Promise<{ [userId: string]: number }> => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) throw new Error('No admin token found');
+    const response: any = await axios.get(`${API_URL}/chats/unread-counts`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to fetch unread counts');
+    return response.data.data;
+  },
+
+  markMessagesAsRead: async (userId: string) => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) throw new Error('No admin token found');
+    const response: any = await axios.post(`${API_URL}/chats/user/${userId}/mark-read`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to mark messages as read');
     return response.data.data;
   },
 };

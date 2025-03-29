@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import io from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import adminService from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
@@ -8,8 +8,10 @@ interface Message {
   _id: string;
   content: string;
   isAdmin: boolean;
-  messageType?: 'text' | 'image' | 'voice';
+  messageType: 'text' | 'image' | 'voice';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
+  senderId: string;
+  chatId: string;
   duration?: number;
   timestamp?: string;
 }
@@ -17,82 +19,67 @@ interface Message {
 interface AdminChatWindowProps {
   userId: string | null;
   username?: string | null;
+  socket:any ;
 }
 
-const AdminChatWindow = ({ userId, username }: AdminChatWindowProps) => {
+const AdminChatWindow = ({ userId, username, socket }: AdminChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<any>(null);
-  const pendingMessages = useRef<Set<string>>(new Set());
+  const adminId = useRef<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Smooth Scrolling
-  const scrollToBottom = useCallback(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
 
-  // Socket Event Handlers
-  const handleNewMessage = useCallback((message: Message) => {
-    setMessages((prev) => {
-      if (prev.some((m) => m._id === message._id && m.timestamp === message.timestamp)) {
-        return prev;
-      }
-      return [...prev, { ...message, status: 'delivered' }];
-    });
-    scrollToBottom();
-  }, [scrollToBottom]);
-
-  const handleMessageDelivered = useCallback((message: Message) => {
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg._id === message._id ? { ...msg, status: 'delivered' } : msg
-      )
-    );
-  }, []);
-
-  const handleMessageError = useCallback(
-    ({ tempId, error }: { tempId: string; error: string }) => {
-      console.error('Message error:', error);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === tempId ? { ...msg, status: 'failed' } : msg
-        )
-      );
-      pendingMessages.current.delete(tempId);
-    },
-    []
-  );
-
-  // Establishing Socket Connection
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token || !userId) return;
 
-    socketRef.current = io('https://chat-web-1ud8.onrender.com', {
-      auth: { token },
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
+    try {
+      const decoded = JSON.parse(atob(token.split('.')[1]));
+      adminId.current = decoded.id;
+    } catch (error) {
+      console.error('Error decoding token:', error);
+      return;
+    }
 
-    socketRef.current.on('connect', () => {
-      console.log('Connected to Socket.IO server as admin');
-    });
+    const handleNewMessage = (message: Message) => {
+      console.log('Received newMessage:', message);
+      if (message.senderId === userId || (message.isAdmin && message.chatId === userId)) {
+        setMessages((prev) => {
+          if (prev.some((m) => m._id === message._id)) return prev;
+          return [...prev, { ...message, status: 'delivered' }];
+        });
+        scrollToBottom();
+      }
+    };
 
-    socketRef.current.on('newMessage', handleNewMessage);
-    socketRef.current.on('messageDelivered', handleMessageDelivered);
-    socketRef.current.on('messageError', handleMessageError);
+    const handleMessageDelivered = (message: Message) => {
+      console.log('Received messageDelivered:', message);
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === message._id ? { ...msg, status: 'delivered' } : msg))
+      );
+    };
+
+    const handleMessageError = ({ tempId, error }: { tempId: string; error: string }) => {
+      console.error('Message error:', error);
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
+      );
+    };
+
+    socket.on('newMessage', handleNewMessage);
+    socket.on('messageDelivered', handleMessageDelivered);
+    socket.on('messageError', handleMessageError);
 
     return () => {
-      socketRef.current?.disconnect();
+      socket.off('newMessage', handleNewMessage);
+      socket.off('messageDelivered', handleMessageDelivered);
+      socket.off('messageError', handleMessageError);
     };
-  }, [userId, handleNewMessage, handleMessageDelivered, handleMessageError]);
+  }, [userId, socket, scrollToBottom]);
 
-  // Fetch Chat History
   useEffect(() => {
     if (!userId) {
       setMessages([]);
@@ -108,10 +95,13 @@ const AdminChatWindow = ({ userId, username }: AdminChatWindowProps) => {
           isAdmin: msg.sender_id.toString() !== chat.user_id.toString(),
           messageType: msg.message_type,
           status: 'delivered',
+          senderId: msg.sender_id.toString(),
+          chatId: chat._id.toString(),
           timestamp: msg.timestamp,
+          duration: msg.duration,
         }));
         setMessages(formattedMessages);
-        setTimeout(scrollToBottom, 100);
+        setTimeout(() => scrollToBottom('auto'), 100);
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
       }
@@ -119,14 +109,9 @@ const AdminChatWindow = ({ userId, username }: AdminChatWindowProps) => {
     fetchChatHistory();
   }, [userId, scrollToBottom]);
 
-  // Handle Message Sending
   const handleSend = useCallback(
-    async (
-      messageType: 'text' | 'image' | 'voice',
-      content: string | File,
-      duration?: number
-    ) => {
-      if (!userId || !socketRef.current) return;
+    async (messageType: 'text' | 'image' | 'voice', content: string | File, duration?: number) => {
+      if (!userId || !socket || !adminId.current) return;
 
       const tempId = Date.now().toString();
       const tempMessage: Message = {
@@ -135,13 +120,13 @@ const AdminChatWindow = ({ userId, username }: AdminChatWindowProps) => {
         isAdmin: true,
         messageType,
         status: 'sending',
+        senderId: adminId.current,
+        chatId: userId,
         duration,
         timestamp: new Date().toISOString(),
       };
 
-      pendingMessages.current.add(tempId);
       setMessages((prev) => [...prev, tempMessage]);
-      scrollToBottom();
 
       try {
         let finalContent = content;
@@ -150,29 +135,14 @@ const AdminChatWindow = ({ userId, username }: AdminChatWindowProps) => {
           finalContent = response.messages[response.messages.length - 1].content;
         }
 
-        socketRef.current.emit(
+        socket.emit(
           'sendMessage',
-          {
-            targetUserId: userId,
-            messageType,
-            content: finalContent,
-            tempId,
-          },
+          { targetUserId: userId, messageType, content: finalContent, tempId },
           (ack: { status: string; message?: Message }) => {
-            pendingMessages.current.delete(tempId);
-
             if (ack?.status === 'success' && ack.message) {
               setMessages((prev) =>
                 prev.map((msg) =>
-                  msg._id === tempId
-                    ? {
-                        ...msg,
-                        _id: ack.message!._id,
-                        content: ack.message!.content,
-                        status: 'delivered',
-                        timestamp: ack.message!.timestamp,
-                      }
-                    : msg
+                  msg._id === tempId ? { ...msg, ...ack.message, status: 'delivered' } : msg
                 )
               );
             }
@@ -181,40 +151,29 @@ const AdminChatWindow = ({ userId, username }: AdminChatWindowProps) => {
       } catch (error) {
         console.error('Failed to send message:', error);
         setMessages((prev) =>
-          prev.map((msg) =>
-            msg._id === tempId ? { ...msg, status: 'failed' } : msg
-          )
+          prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
         );
-        pendingMessages.current.delete(tempId);
       }
     },
-    [userId, scrollToBottom]
+    [userId, socket]
   );
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-chat-bg">
+    <div className="flex-1 flex flex-col h-full bg-gray-50">
       {userId ? (
         <>
-          {/* Header */}
-          <div className="p-4 bg-header-bg text-text-primary shadow-md border-b border-gray-300 flex items-center justify-between">
-            <h3 className="text-lg font-semibold truncate">
-              Chat with {username || 'User'}
-            </h3>
+          <div className="p-4 bg-white border-b border-gray-200">
+            <h3 className="text-lg font-semibold">Chat with {username || 'User'}</h3>
           </div>
-
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
+          <div className="flex-1 overflow-y-auto p-4" ref={chatContainerRef}>
             <ChatList messages={messages} />
+            <div ref={messagesEndRef} />
           </div>
-
-          {/* Chat Input */}
-          <div className="border-t bg-gray-50 p-4 shadow-inner">
-            <ChatInput onSend={handleSend} />
-          </div>
+          <ChatInput onSend={handleSend} />
         </>
       ) : (
-        <div className="flex-1 flex items-center justify-center bg-white">
-          <p className="text-gray-600 text-lg">Select a user to start chatting</p>
+        <div className="flex-1 flex items-center justify-center text-gray-500">
+          Select a user to start chatting
         </div>
       )}
     </div>
