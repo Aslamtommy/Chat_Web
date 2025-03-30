@@ -1,11 +1,19 @@
 import { useNavigate } from 'react-router-dom';
+import { FiArrowLeft, FiLogOut } from 'react-icons/fi';
 
 interface AdminHeaderProps {
   onLogout: () => void;
   adminName?: string;
+  showBackButton?: boolean;
+  onBack?: () => void;
 }
 
-const AdminHeader = ({ onLogout, adminName = "Admin" }: AdminHeaderProps) => {
+const AdminHeader = ({ 
+  onLogout, 
+  adminName = "Admin",
+  showBackButton = false,
+  onBack = () => {}
+}: AdminHeaderProps) => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -16,20 +24,33 @@ const AdminHeader = ({ onLogout, adminName = "Admin" }: AdminHeaderProps) => {
 
   return (
     <header className="flex items-center justify-between px-4 sm:px-6 py-3 bg-black/40 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
-      {/* Logo & Dashboard Title */}
+      {/* Left Section - Back Button & Logo */}
       <div className="flex items-center space-x-3">
-        <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center border border-amber-500/30 shadow-lg">
-          <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" />
-          </svg>
-        </div>
-        <div>
-          <h2 className="text-2xl font-serif font-semibold text-white tracking-wide">Admin Dashboard</h2>
-          <p className="text-amber-500/60 text-sm font-medium">Welcome back, {adminName}</p>
+        {/* Back Button (Mobile Only) */}
+        {showBackButton && (
+          <button
+            onClick={onBack}
+            className="md:hidden p-2 mr-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
+          >
+            <FiArrowLeft className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Logo & Dashboard Title */}
+        <div className="flex items-center space-x-3">
+          <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center border border-amber-500/30 shadow-lg">
+            <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+          </div>
+          <div className={showBackButton ? 'hidden md:block' : ''}>
+            <h2 className="text-2xl font-serif font-semibold text-white tracking-wide">Admin Dashboard</h2>
+            <p className="text-amber-500/60 text-sm font-medium">Welcome back, {adminName}</p>
+          </div>
         </div>
       </div>
 
-      {/* Admin Profile & Logout */}
+      {/* Right Section - Admin Profile & Logout */}
       <div className="flex items-center space-x-4">
         {/* Profile - Hidden on mobile */}
         <div className="hidden md:flex items-center space-x-3">
@@ -51,9 +72,7 @@ const AdminHeader = ({ onLogout, adminName = "Admin" }: AdminHeaderProps) => {
           title="Logout"
         >
           <span className="hidden sm:inline">Logout</span>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
+          <FiLogOut className="w-5 h-5" />
         </button>
       </div>
     </header>
