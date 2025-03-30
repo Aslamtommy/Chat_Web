@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import io, { Socket } from 'socket.io-client';
+import io  from 'socket.io-client';
 import AdminHeader from '../admin/AdminHeader';
 import AdminSidebar from '../admin/AdminSidebar';
 import AdminChatWindow from '../admin/AdminChatWindow';
@@ -28,7 +28,7 @@ const AdminDashboard = () => {
       return;
     }
 
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io(import.meta.env.VITE_API_URL , {     
       auth: { token },
       reconnection: true,
       reconnectionAttempts: 5,
@@ -85,7 +85,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-chat-bg">
+    <div className="flex flex-col h-screen bg-black/40 backdrop-blur-sm">
       <AdminHeader onLogout={handleLogout} />
       <div className="flex flex-1 overflow-hidden">
         {isSocketConnected && socketRef.current ? (
@@ -95,18 +95,37 @@ const AdminDashboard = () => {
               selectedUserId={selectedUserId}
               socket={socketRef.current}
             />
-            <div className="flex-1 flex flex-col md:flex-row">
+            <div className="flex-1 flex flex-col">
               <AdminChatWindow
                 userId={selectedUserId}
                 username={selectedUserName}
                 socket={socketRef.current}
               />
-              {selectedUserId && <AdminUserDetails userId={selectedUserId} />}
+              {selectedUserId && (
+                <div className="lg:hidden">
+                  <AdminUserDetails userId={selectedUserId} />
+                </div>
+              )}
             </div>
+            {selectedUserId && (
+              <div className="hidden lg:block w-80 border-l border-white/10 bg-black/20 backdrop-blur-sm">
+                <AdminUserDetails userId={selectedUserId} />
+              </div>
+            )}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
-            {socketRef.current ? 'Connecting to server...' : 'Failed to initialize connection'}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 mx-auto bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
+                <svg className="w-8 h-8 text-amber-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <p className="text-white/70 text-lg">
+                {socketRef.current ? 'Connecting to server...' : 'Failed to initialize connection'}
+              </p>
+              <p className="text-amber-500/60 text-sm">Please check your connection and try again</p>
+            </div>
           </div>
         )}
       </div>

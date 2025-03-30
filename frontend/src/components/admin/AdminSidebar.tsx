@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Socket } from 'socket.io-client';
+ 
 import adminService from '../Services/adminService';
 
 interface User {
@@ -109,7 +109,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket }: AdminSidebarProp
   return (
     <>
       <button
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-primary-dark text-secondary hover:bg-primary-light transition-colors"
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 transition-colors"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,36 +117,54 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket }: AdminSidebarProp
         </svg>
       </button>
       <div
-        className={`fixed md:static inset-y-0 left-0 w-64 bg-white shadow-deep p-4 transform transition-transform duration-300 ease-in-out z-40 ${
+        className={`fixed md:static inset-y-0 left-0 w-64 bg-black/40 backdrop-blur-md border-r border-white/10 transform transition-transform duration-300 ease-in-out z-40 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0 md:w-72 h-full overflow-y-auto`}
       >
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Search users"
-            className="w-full p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-light placeholder:text-muted text-sm"
-          />
+        <div className="p-4 border-b border-white/10">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search users"
+              className="w-full p-2.5 pl-10 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-amber-500/50 text-sm"
+            />
+            <svg
+              className="absolute left-3 top-2.5 w-5 h-5 text-white/30"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
         </div>
-        <div className="space-y-2">
+        <div className="p-2 space-y-1">
           {sortedUsers.map((user) => (
             <div
               key={user._id}
               onClick={() => handleUserClick(user._id)}
-              className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center justify-between ${
+              className={`p-3 rounded-lg cursor-pointer transition-all duration-200 flex items-center justify-between ${
                 selectedUserId === user._id
-                  ? 'bg-primary-light text-secondary'
-                  : 'hover:bg-gray-100 text-primary-dark'
+                  ? 'bg-amber-500/20 border border-amber-500/30'
+                  : 'hover:bg-white/5 border border-transparent hover:border-white/10'
               }`}
             >
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-primary-light rounded-full flex items-center justify-center text-secondary font-semibold text-sm">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
+                  selectedUserId === user._id
+                    ? 'bg-amber-500/30 text-amber-500 border border-amber-500/50'
+                    : 'bg-white/5 text-white/70 border border-white/10'
+                }`}>
                   {user.username.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold truncate">{user.username}</p>
+                <div className="flex-1 min-w-0">
+                  <p className={`font-medium truncate ${
+                    selectedUserId === user._id ? 'text-white' : 'text-white/70'
+                  }`}>
+                    {user.username}
+                  </p>
                   {user.lastMessageTimestamp && (
-                    <p className="text-xs text-muted truncate">
+                    <p className="text-xs text-amber-500/60 truncate">
                       {new Date(user.lastMessageTimestamp).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
@@ -157,7 +175,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket }: AdminSidebarProp
               </div>
               {user.unreadCount && user.unreadCount > 0 && selectedUserId !== user._id && (
                 <div className="flex items-center">
-                  <span className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">
+                  <span className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
                     {user.unreadCount}
                   </span>
                 </div>
@@ -168,7 +186,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket }: AdminSidebarProp
       </div>
       {isSidebarOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          className="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-30"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}

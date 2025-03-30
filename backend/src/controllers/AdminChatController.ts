@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import ChatService from '../services/ChatService';
 import StorageService from '../services/StorageService';
 import ChatRepository from '../repositories/ChatRepository';
+import { io } from '../server';
 
 class AdminChatController {
   async getAllChats(req: Request, res: Response): Promise<void> {
@@ -31,10 +32,6 @@ class AdminChatController {
   async getUserChatHistory(req: Request, res: Response): Promise<void> {
     try {
       const { userId } = req.params;
-      const adminId = req.user?.id;
-      
-      if (!adminId) throw new Error('Admin ID not found');
-
       const chat = await ChatRepository.findByUserId(userId);
       if (!chat) {
         res.json({ success: true, data: { messages: [] } });
@@ -88,6 +85,26 @@ class AdminChatController {
       }
 
       const updatedChat = await ChatService.saveMessage(userId, senderId, messageType, content);
+
+      // Emit real-time update via Socket.io
+      const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
+      if (!newMessage || !newMessage._id) {
+        throw new Error('Message not saved properly');
+      }
+      const messagePayload = {
+        _id: newMessage._id.toString(),
+        chatId: updatedChat._id.toString(),
+        senderId,
+        content: newMessage.content,
+        messageType: newMessage.message_type,
+        timestamp: newMessage.timestamp,
+        status: 'delivered',
+        isAdmin: true,
+        read: false,
+      };
+
+      io.to(userId).emit('newMessage', messagePayload);
+
       res.json({ success: true, data: updatedChat });
     } catch (error) {
       res.status(500).json({ success: false, error: (error as Error).message });

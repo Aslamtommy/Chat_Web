@@ -17,7 +17,7 @@ interface ChatListProps {
 
 const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({ messages }, ref) => {
   return (
-    <div ref={ref} className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div ref={ref} className="flex-1 overflow-y-auto p-6 space-y-6">
       {messages.map((message) => (
         <ChatMessage
           key={message._id}

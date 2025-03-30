@@ -14,46 +14,34 @@ const auth_1 = __importDefault(require("./routes/auth"));
 const chat_1 = __importDefault(require("./routes/chat"));
 const upload_1 = __importDefault(require("./routes/upload"));
 const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
-const ChatService_1 = __importDefault(require("./services/ChatService")); // Import ChatService for real-time message handling
+const ChatService_1 = __importDefault(require("./services/ChatService"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const ChatRepository_1 = __importDefault(require("./repositories/ChatRepository"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-const server = http_1.default.createServer(app); // Create an HTTP server for Socket.IO
+const server = http_1.default.createServer(app);
+const FRONTEND_URL = process.env.FRONTEND_URL;
 const io = new socket_io_1.Server(server, {
     cors: {
-        origin: 'https://chat-web-beige.vercel.app', // Match your frontend URL
+        origin: FRONTEND_URL,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
     },
 });
 exports.io = io;
-// Middleware
-app.options('*', (0, cors_1.default)({
-    origin: 'https://chat-web-beige.vercel.app',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-}));
 app.use((0, cors_1.default)({
-    origin: 'https://chat-web-beige.vercel.app',
+    origin: FRONTEND_URL,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
-// Test endpoint
-app.get('/test', (req, res) => {
-    res.json({ message: 'CORS test' });
-});
-// Routes
 app.use('/auth', auth_1.default);
 app.use('/chat', chat_1.default);
 app.use('/upload', upload_1.default);
 app.use('/admin', adminRoutes_1.default);
 app.get('/', (req, res) => {
-    console.log('GET / accessed');
     res.send('Backend is running');
 });
-// MongoDB Connection
 const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 if (!mongoUri) {
     console.error('Error: MONGODB_URI is not defined in environment variables');
@@ -65,7 +53,6 @@ mongoose_1.default.connect(mongoUri)
     console.error('MongoDB connection error:', err);
     process.exit(1);
 });
-// Socket.IO Authentication Middleware
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token)
@@ -84,8 +71,56 @@ io.on('connection', (socket) => {
     const userId = socket.data.user.id;
     const isAdmin = socket.data.user.role === 'admin';
     socket.join(userId);
-    if (isAdmin)
+    if (isAdmin) {
         socket.join('admin-room');
+        console.log(`Admin ${userId} joined admin-room`);
+        console.log(`Triggering initial sync for admin ${userId}`);
+        socket.emit('requestSyncUnreadCounts');
+    }
+    if (isAdmin) {
+        socket.on('syncUnreadCounts', async () => {
+            try {
+                console.log(`Syncing unread counts for admin ${userId}`);
+                const allUsers = await mongoose_1.default.model('User').find({ role: 'user' });
+                const unreadCounts = {};
+                for (const user of allUsers) {
+                    const uid = user._id.toString();
+                    const count = await ChatRepository_1.default.getUnreadCount(uid);
+                    unreadCounts[uid] = count;
+                    console.log(`Calculated unread count for ${uid}: ${count}`);
+                }
+                console.log('Sending initial unread counts on sync:', unreadCounts);
+                socket.emit('initialUnreadCounts', unreadCounts);
+            }
+            catch (error) {
+                console.error('Error syncing unread counts:', error);
+            }
+        });
+    }
+    socket.on('markMessagesAsRead', async ({ chatId }) => {
+        try {
+            if (!isAdmin) {
+                console.log(`Non-admin ${userId} attempted to mark messages as read`);
+                return;
+            }
+            console.log(`Received markMessagesAsRead event for chat ${chatId} by admin ${userId}`);
+            await ChatRepository_1.default.markMessagesAsRead(chatId, userId);
+            const unreadCount = await ChatRepository_1.default.getUnreadCount(chatId);
+            console.log(`Updated unread count for ${chatId} after markMessagesAsRead: ${unreadCount}`);
+            io.to('admin-room').emit('updateUnreadCount', {
+                userId: chatId,
+                unreadCount,
+            });
+            io.to(chatId).emit('messagesRead', {
+                chatId,
+                readBy: userId,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            console.error('Error marking messages as read:', error);
+        }
+    });
     socket.on('sendMessage', async ({ targetUserId, messageType, content, tempId }, ack) => {
         try {
             const senderId = socket.data.user.id;
@@ -100,17 +135,21 @@ io.on('connection', (socket) => {
                     throw new Error('No admin available');
                 recipientId = admin._id.toString();
             }
-            const chatThreadId = isAdmin ? targetUserId : recipientId;
-            // Check for duplicate message
-            const existingMessage = await ChatRepository_1.default.findMessageByContent(chatThreadId, content);
-            if (existingMessage) {
-                socket.emit('messageError', { tempId, error: 'Duplicate message detected' });
-                return ack?.({ status: 'error', error: 'Duplicate message' });
+            const chatThreadId = isAdmin ? targetUserId : senderId;
+            console.log(`Message from ${senderId} (${isAdmin ? 'admin' : 'user'}) to ${recipientId}`);
+            // Only check for duplicates for text messages
+            if (messageType === 'text') {
+                const existingMessage = await ChatRepository_1.default.findMessageByContent(chatThreadId, content);
+                if (existingMessage) {
+                    console.log(`Duplicate message detected for chat ${chatThreadId}: ${content}`);
+                    socket.emit('messageError', { tempId, error: 'Duplicate message detected' });
+                    return ack?.({ status: 'error', error: 'Duplicate message' });
+                }
             }
             const updatedChat = await ChatService_1.default.saveMessage(chatThreadId, senderId, messageType, content);
             const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
-            if (newMessage._id == undefined) {
-                console.log('newMessage._id is undefined');
+            if (!newMessage._id) {
+                console.log('Message not saved properly');
                 return ack?.({ status: 'error', error: 'Message not saved' });
             }
             const messagePayload = {
@@ -120,25 +159,25 @@ io.on('connection', (socket) => {
                 content: newMessage.content,
                 messageType: newMessage.message_type,
                 timestamp: newMessage.timestamp,
-                status: 'delivered'
+                status: 'delivered',
+                isAdmin: isAdmin,
+                read: false,
             };
-            const recipientRoom = isAdmin ? targetUserId : 'admin-room';
-            // Prevent duplicate emission with once handler
-            io.to(recipientRoom).emit('newMessage', {
-                ...messagePayload,
-                isAdmin: isAdmin
-            });
-            socket.emit('messageDelivered', {
-                ...messagePayload,
-                isAdmin: senderRole === 'admin',
-                status: 'delivered'
-            });
-            // Enhanced admin notification
+            // Emit to all relevant parties
+            if (isAdmin) {
+                io.to(targetUserId).emit('newMessage', messagePayload);
+            }
+            else {
+                io.to('admin-room').emit('newMessage', messagePayload);
+            }
+            // Send delivery confirmation to sender
+            socket.emit('messageDelivered', messagePayload);
+            // Update unread counts if needed
             if (!isAdmin) {
-                io.to('admin-room').emit('newUserMessage', {
+                const unreadCount = await ChatRepository_1.default.getUnreadCount(senderId);
+                io.to('admin-room').emit('updateUnreadCount', {
                     userId: senderId,
-                    message: messagePayload,
-                    timestamp: new Date().toISOString()
+                    unreadCount,
                 });
             }
             ack?.({ status: 'success', message: messagePayload });
@@ -151,9 +190,11 @@ io.on('connection', (socket) => {
     });
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${userId}`);
+        if (isAdmin) {
+            console.log(`Admin ${userId} left admin-room`);
+        }
     });
 });
-// Start Server
 const port = process.env.PORT || 5000;
 server.listen(port, () => {
     console.log(`Server started on port ${port} with HTTP and Socket.IO`);

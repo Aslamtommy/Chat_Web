@@ -13,6 +13,20 @@ class AuthService {
         if (existingUser) {
             throw new Error('Email already exists');
         }
+        // Validate password strength
+        if (password.length < 6) {
+            throw new Error('Password must be at least 6 characters long');
+        }
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new Error('Invalid email format');
+        }
+        // Validate phone number format
+        const phoneRegex = /^\d{10}$/;
+        if (!phoneRegex.test(phoneNo)) {
+            throw new Error('Phone number must be 10 digits');
+        }
         const hashedPassword = await bcryptjs_1.default.hash(password, 10);
         const user = await UserRepository_1.default.create({
             username,
@@ -29,25 +43,31 @@ class AuthService {
         return user;
     }
     async login(email, password) {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new Error('Invalid email format');
+        }
         const user = await UserRepository_1.default.findByEmail(email);
         if (!user) {
-            throw new Error('Email not found');
+            throw new Error('User not found');
         }
-        if (!(await bcryptjs_1.default.compare(password, user.password))) {
+        const isPasswordValid = await bcryptjs_1.default.compare(password, user.password);
+        if (!isPasswordValid) {
             throw new Error('Incorrect password');
         }
         const token = jsonwebtoken_1.default.sign({ id: user._id, role: user.role }, 'mysecret', {
-            expiresIn: '1h', // Add token expiration for security
+            expiresIn: '1h',
         });
         return { token, user };
     }
     async getUserById(id) {
         const user = await UserRepository_1.default.findById(id);
-        if (!user)
-            return null;
+        if (!user) {
+            throw new Error('User not found');
+        }
         return user;
     }
-    // In AuthService.ts
     async updateProfile(userId, profileData) {
         // Convert age to number if it exists and is a string
         if (profileData.age) {

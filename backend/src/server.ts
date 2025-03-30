@@ -22,16 +22,17 @@ dotenv.config();
 
 const app: Express = express();
 const server = http.createServer(app);
+const FRONTEND_URL = process.env.FRONTEND_URL
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: FRONTEND_URL,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   },
 });
 
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: FRONTEND_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -150,11 +151,14 @@ io.on('connection', (socket) => {
       const chatThreadId = isAdmin ? targetUserId : senderId;
       console.log(`Message from ${senderId} (${isAdmin ? 'admin' : 'user'}) to ${recipientId}`);
 
-      const existingMessage = await ChatRepository.findMessageByContent(chatThreadId, content);
-      if (existingMessage) {
-        console.log(`Duplicate message detected for chat ${chatThreadId}: ${content}`);
-        socket.emit('messageError', { tempId, error: 'Duplicate message detected' });
-        return ack?.({ status: 'error', error: 'Duplicate message' });
+      // Only check for duplicates for text messages
+      if (messageType === 'text') {
+        const existingMessage = await ChatRepository.findMessageByContent(chatThreadId, content);
+        if (existingMessage) {
+          console.log(`Duplicate message detected for chat ${chatThreadId}: ${content}`);
+          socket.emit('messageError', { tempId, error: 'Duplicate message detected' });
+          return ack?.({ status: 'error', error: 'Duplicate message' });
+        }
       }
 
       const updatedChat = await ChatService.saveMessage(
@@ -182,18 +186,23 @@ io.on('connection', (socket) => {
         read: false,
       };
 
+      // Emit to all relevant parties
       if (isAdmin) {
         io.to(targetUserId).emit('newMessage', messagePayload);
-        socket.emit('messageDelivered', messagePayload);
       } else {
         io.to('admin-room').emit('newMessage', messagePayload);
+      }
+      
+      // Send delivery confirmation to sender
+      socket.emit('messageDelivered', messagePayload);
+      
+      // Update unread counts if needed
+      if (!isAdmin) {
         const unreadCount = await ChatRepository.getUnreadCount(senderId);
-        console.log(`Emitting updateUnreadCount for user ${senderId}: ${unreadCount}`);
         io.to('admin-room').emit('updateUnreadCount', {
           userId: senderId,
           unreadCount,
         });
-        socket.emit('messageDelivered', messagePayload);
       }
 
       ack?.({ status: 'success', message: messagePayload });
@@ -209,11 +218,6 @@ io.on('connection', (socket) => {
     if (isAdmin) {
       console.log(`Admin ${userId} left admin-room`);
     }
-  });
-
-  // Log all incoming events for debugging
-  socket.onAny((eventName, ...args) => {
-    console.log(`Received event: ${eventName}`, args);
   });
 });
 

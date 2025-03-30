@@ -5,6 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const ChatService_1 = __importDefault(require("../services/ChatService"));
 const StorageService_1 = __importDefault(require("../services/StorageService"));
+const server_1 = require("../server");
+const ChatRepository_1 = __importDefault(require("../repositories/ChatRepository"));
 class UserChatController {
     async getMyChatHistory(req, res) {
         try {
@@ -37,6 +39,29 @@ class UserChatController {
                 content = await StorageService_1.default.uploadFile(file, messageType);
             }
             const updatedChat = await ChatService_1.default.saveMessage(userId, userId, messageType, content);
+            // Emit real-time update via Socket.io
+            const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
+            if (!newMessage || !newMessage._id) {
+                throw new Error('Message not saved properly');
+            }
+            const messagePayload = {
+                _id: newMessage._id.toString(),
+                chatId: updatedChat._id.toString(),
+                senderId: userId,
+                content: newMessage.content,
+                messageType: newMessage.message_type,
+                timestamp: newMessage.timestamp,
+                status: 'delivered',
+                isAdmin: false,
+                read: false,
+            };
+            server_1.io.to('admin-room').emit('newMessage', messagePayload);
+            // Update unread counts
+            const unreadCount = await ChatRepository_1.default.getUnreadCount(userId);
+            server_1.io.to('admin-room').emit('updateUnreadCount', {
+                userId,
+                unreadCount,
+            });
             res.json({ success: true, data: updatedChat });
         }
         catch (error) {

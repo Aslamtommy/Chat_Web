@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import ChatService from '../services/ChatService';
 import StorageService from '../services/StorageService';
-
+import { io } from '../server';
+import ChatRepository from '../repositories/ChatRepository';
 class UserChatController {
   async getMyChatHistory(req: Request, res: Response): Promise<void> {
     try {
@@ -32,6 +33,33 @@ class UserChatController {
       }
 
       const updatedChat = await ChatService.saveMessage(userId, userId, messageType, content);
+
+      // Emit real-time update via Socket.io
+      const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
+      if (!newMessage || !newMessage._id) {
+        throw new Error('Message not saved properly');
+      }
+      const messagePayload = {
+        _id: newMessage._id.toString(),
+        chatId: updatedChat._id.toString(),
+        senderId: userId,
+        content: newMessage.content,
+        messageType: newMessage.message_type,
+        timestamp: newMessage.timestamp,
+        status: 'delivered',
+        isAdmin: false,
+        read: false,
+      };
+
+      io.to('admin-room').emit('newMessage', messagePayload);
+
+      // Update unread counts
+      const unreadCount = await ChatRepository.getUnreadCount(userId);
+      io.to('admin-room').emit('updateUnreadCount', {
+        userId,
+        unreadCount,
+      });
+
       res.json({ success: true, data: updatedChat });
     } catch (error) {
       res.status(500).json({ success: false, error: (error as Error).message });

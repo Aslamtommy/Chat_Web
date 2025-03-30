@@ -67,11 +67,11 @@ const Home = () => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      navigate('/login');
+      navigate("/");
       return;
     }
 
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io(import.meta.env.VITE_API_URL , {
       auth: { token },
       reconnection: true,
       reconnectionAttempts: 5,
@@ -136,29 +136,48 @@ const Home = () => {
       scrollToBottom();
 
       try {
-        let finalContent = content;
         if (messageType !== 'text') {
+          // Handle non-text messages via HTTP
           const response = await chatService.sendMessage(messageType, content);
-          finalContent = response.messages[response.messages.length - 1].content;
-        }
-
-        socketRef.current.emit(
-          'sendMessage',
-          { messageType, content: finalContent, tempId },
-          (ack: { status: string; message?: Message }) => {
-            pendingMessages.current.delete(tempId);
-            if (ack?.status === 'success' && ack.message) {
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg._id === tempId
-                    ? { ...msg, ...ack.message, status: 'delivered' }
-                    : msg
-                )
-              );
-              scrollToBottom();
+          const savedMessage = response.messages[response.messages.length - 1];
+          
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg._id === tempId
+                ? {
+                    _id: savedMessage._id.toString(),
+                    content: savedMessage.content,
+                    isAdmin: false,
+                    messageType: savedMessage.message_type,
+                    status: 'delivered',
+                    senderId: userId.current || '',
+                    duration: savedMessage.duration || duration,
+                    timestamp: savedMessage.timestamp,
+                  }
+                : msg
+            )
+          );
+          pendingMessages.current.delete(tempId);
+        } else {
+          // Handle text messages via Socket.io
+          socketRef.current.emit(
+            'sendMessage',
+            { messageType, content: content as string, tempId },
+            (ack: { status: string; message?: Message }) => {
+              pendingMessages.current.delete(tempId);
+              if (ack?.status === 'success' && ack.message) {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg._id === tempId
+                      ? { ...msg, ...ack.message, status: 'delivered' }
+                      : msg
+                  )
+                );
+                scrollToBottom();
+              }
             }
-          }
-        );
+          );
+        }
       } catch (error) {
         console.error('Failed to send message:', error);
         setMessages((prev) =>
@@ -177,18 +196,18 @@ const Home = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100 font-sans">
+    <div className="flex flex-col h-screen bg-black font-serif">
       <ChatHeader />
-      <div className="flex-1 flex flex-col bg-white rounded-t-3xl shadow-lg overflow-hidden mx-4 mb-4 mt-2">
+      <div className="flex-1 flex flex-col mx-4 mb-4 mt-2 overflow-hidden rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10">
         {activeTab === 'chats' && (
           <>
             <div
-              className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white"
+              className="flex-1 overflow-y-auto bg-gradient-to-b from-black/40 to-black/20"
               ref={chatContainerRef}
             >
               <ChatList messages={messages} />
             </div>
-            <div className="border-t border-gray-200 bg-white">
+            <div className="border-t border-white/10 bg-black/30 backdrop-blur-md">
               <ChatInput onSend={handleSend} />
             </div>
           </>
@@ -201,25 +220,29 @@ const Home = () => {
           setActiveTab('chats');
         }}
       />
-      <div className="flex justify-around py-3 px-6 bg-white border-t border-gray-200 shadow-md rounded-b-xl mx-4 mb-4">
-        {[
-          { id: 'chats', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: 'Chats' },
-          { id: 'files', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', label: 'Files' },
-          { id: 'profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', label: 'Profile' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabChange(tab.id as 'chats' | 'files' | 'profile')}
-            className={`flex flex-col items-center transition-all duration-200 ${
-              activeTab === tab.id ? 'text-gray-900 scale-105' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={tab.icon} />
-            </svg>
-            <span className="text-xs mt-1 font-medium tracking-wide">{tab.label}</span>
-          </button>
-        ))}
+      <div className="mx-4 mb-4">
+        <div className="flex justify-around py-3 px-6 bg-black/30 backdrop-blur-sm border border-white/10 rounded-xl">
+          {[
+            { id: 'chats', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: 'Chats' },
+            { id: 'files', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', label: 'Files' },
+            { id: 'profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', label: 'Profile' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id as 'chats' | 'files' | 'profile')}
+              className={`flex flex-col items-center transition-all duration-300 ${
+                activeTab === tab.id 
+                  ? 'text-amber-500 scale-105' 
+                  : 'text-white/70 hover:text-amber-500/80'
+              }`}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d={tab.icon} />
+              </svg>
+              <span className="text-xs mt-1.5 font-medium tracking-wider">{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -1,48 +1,289 @@
+const defaultTheme = require('tailwindcss/defaultTheme');
+
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
     extend: {
       colors: {
-        'chat-bg': '#F4F4F6',              // Light gray background for chat pages
-        'text-primary': '#1F2937',         // Dark charcoal for primary text
-        'text-secondary': '#4B5563',       // Softer gray for secondary text
-        'header-bg': '#FFFFFF',            // White for header and footer backgrounds
-        'primary-light': '#93C5FD',        // Lighter blue for hover states
-        'text-muted': '#9CA3AF',           // Muted gray for placeholder/timestamps
-        'success': '#16A34A',              // Green for success badges
-        'error': '#DC2626',                // Red for errors
-        'warning': '#F59E0B',              // Orange for warnings
-        'gray-50': '#F9FAFB',              // Ultra-light gray for subtle contrast
-      },
-      boxShadow: {
-        'soft': '0 2px 8px rgba(0, 0, 0, 0.08)',    // Soft shadow for subtle elevation
-        'deep': '0 6px 18px rgba(0, 0, 0, 0.12)',   // Deeper shadow for modals and cards
-        'message': '0 3px 10px rgba(0, 0, 0, 0.06)', // Shadow for chat bubbles
+        classic: {
+          50: '#fafaf9',
+          100: '#f5f5f4',
+          200: '#e7e5e4',
+          300: '#d6d3d1',
+          400: '#a8a29e',
+          500: '#78716c',
+          600: '#57534e',
+          700: '#44403c',
+          800: '#292524',
+          900: '#1c1917',
+        },
+        accent: {
+          50: '#fffbeb',
+          100: '#fef3c7',
+          200: '#fde68a',
+          300: '#fcd34d',
+          400: '#fbbf24',
+          500: '#f59e0b',
+          600: '#d97706',
+          700: '#b45309',
+          800: '#92400e',
+          900: '#78350f',
+        },
+        primary: {
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+          800: '#3730a3',
+          900: '#312e81',
+        },
+        neutral: {
+          50: '#fafafa',
+          100: '#f5f5f5',
+          200: '#e5e5e5',
+          300: '#d4d4d4',
+          400: '#a3a3a3',
+          500: '#737373',
+          600: '#525252',
+          700: '#404040',
+          800: '#262626',
+          900: '#171717',
+        },
+        // Primary Colors
+        'cosmic': {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+        },
+        // Accent Colors
+        'gold': {
+          50: '#fff7ed',
+          100: '#ffedd5',
+          200: '#fed7aa',
+          300: '#fdba74',
+          400: '#fb923c',
+          500: '#f97316',
+          600: '#ea580c',
+          700: '#c2410c',
+          800: '#9a3412',
+          900: '#7c2d12',
+        },
+        // Mystical Colors
+        'mystic': {
+          50: '#f5f3ff',
+          100: '#ede9fe',
+          200: '#ddd6fe',
+          300: '#c4b5fd',
+          400: '#a78bfa',
+          500: '#8b5cf6',
+          600: '#7c3aed',
+          700: '#6d28d9',
+          800: '#5b21b6',
+          900: '#4c1d95',
+        },
+        'text-primary': '#1F2937',
+        'text-secondary': '#6B7280',
+        'chat-bg': '#F9FAFB',
+        'header-bg': '#FFFFFF',            // Pure white for headers
+        'primary-light': '#60A5FA',        // Lighter blue for hover states
+        'primary-dark': '#2563EB',         // Darker blue for active states
+        'text-muted': '#94A3B8',           // Subtle slate for muted text
+        'success': '#10B981',              // Emerald for success states
+        'error': '#EF4444',                // Rose for errors
+        'warning': '#F59E0B',              // Amber for warnings
+        'gray-50': '#F8FAFC',              // Slate-50 for subtle backgrounds
+        'message-sent': '#EFF6FF',         // Light blue for sent messages
+        'message-received': '#F1F5F9',     // Light slate for received messages
+        stone: {
+          50: '#fafaf9',
+          100: '#f5f5f4',
+          200: '#e7e5e4',
+          300: '#d6d3d1',
+          400: '#a8a29e',
+          500: '#78716c',
+          600: '#57534e',
+          700: '#44403c',
+          800: '#292524',
+          900: '#1c1917',
+        }
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
-        poppins: ['Poppins', 'sans-serif'],
-        roboto: ['Roboto', 'sans-serif'],
-        cinzel: ['Cinzel', 'serif'],
+        serif: ['Playfair Display', 'serif'],
+        display: ['Playfair Display', ...defaultTheme.fontFamily.serif],
       },
-      borderRadius: {
-        'message': '1rem',
-        'btn': '0.6rem',
-        'card': '1.2rem',
+      fontSize: {
+        'display-lg': ['4.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
+        'display-md': ['3.75rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
+        'display-sm': ['3rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
       },
-      transitionProperty: {
-        'height': 'height',
-        'spacing': 'margin, padding',
-        'opacity': 'opacity',
+      boxShadow: {
+        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.05), 0 10px 20px -2px rgba(0, 0, 0, 0.03)',
+        'elegant': '0 20px 40px -15px rgba(0, 0, 0, 0.1)',
+        'card': '0 10px 30px -10px rgba(0, 0, 0, 0.08)',
+        'nav': '0 -10px 30px -10px rgba(0, 0, 0, 0.08)',
+        'glow': '0 0 20px rgba(251, 191, 36, 0.3)',
+        'inner-glow': 'inset 0 0 15px rgba(251, 191, 36, 0.1)',
+        'inner-sm': 'inset 0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+        'inner-md': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.1)',
+        'inner-lg': 'inset 0 4px 6px -1px rgba(0, 0, 0, 0.15)',
+        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+        'glass-sm': '0 4px 16px 0 rgba(31, 38, 135, 0.25)',
+        'glass-lg': '0 12px 48px 0 rgba(31, 38, 135, 0.45)',
+      },
+      animation: {
+        'fade-in': 'fade-in 0.6s ease-out',
+        'slide-up': 'slide-up 0.6s ease-out',
+        'slide-down': 'slide-down 0.6s ease-out',
+        'float': 'float 6s ease-in-out infinite',
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'message-send': 'messageSend 0.3s ease-out',
+        'message-receive': 'messageReceive 0.3s ease-out',
+        'notification': 'notification 0.5s ease-out',
+      },
+      keyframes: {
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'slide-up': {
+          '0%': { transform: 'translateY(20px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        'slide-down': {
+          '0%': { transform: 'translateY(-20px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        pulse: {
+          '0%': { opacity: '1' },
+          '50%': { opacity: '0.5' },
+          '100%': { opacity: '1' },
+        },
+        messageSend: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        messageReceive: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        notification: {
+          '0%': { transform: 'translateX(100%)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+      },
+      backgroundImage: {
+        'gradient-elegant': 'linear-gradient(to right, rgb(251, 191, 36), rgb(217, 119, 6))',
+        'gradient-soft': 'linear-gradient(to right, rgb(250, 250, 249), rgb(245, 245, 244))',
+        'gradient-card': 'linear-gradient(to bottom right, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.8))',
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+        'gradient-mystic': 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+        'gradient-gold': 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+        'subtle-pattern': "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCI+CjxyZWN0IHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgZmlsbD0ibm9uZSI+PC9yZWN0Pgo8cGF0aCBkPSJNMzAgMzBtLTI4IDBhMjggMjggMCAxIDAgNTYgMGEyOCAyOCAwIDEgMCAtNTYgMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmZmZmMDYiIHN0cm9rZS13aWR0aD0iMC41Ij48L3BhdGg+CjxwYXRoIGQ9Ik0zMCAzMG0tMjAgMGEyMCAyMCAwIDEgMCA0MCAwYTIwIDIwIDAgMSAwIC00MCAwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYwNiIgc3Ryb2tlLXdpZHRoPSIwLjUiPjwvcGF0aD4KPC9zdmc+')",
       },
       spacing: {
         '18': '4.5rem',
+        '22': '5.5rem',
+        '26': '6.5rem',
+        '30': '7.5rem',
+        '34': '8.5rem',
+        '38': '9.5rem',
+        '42': '10.5rem',
+        '46': '11.5rem',
+        '50': '12.5rem',
+        '88': '22rem',
+        '128': '32rem',
+      },
+      maxWidth: {
+        'message': '75%',
+        'chat': '1200px',
+        'xxs': '16rem',
+        'xs': '20rem',
+        'sm': '24rem',
+        'md': '28rem',
+        'lg': '32rem',
+        'xl': '36rem',
+        '2xl': '42rem',
+        '3xl': '48rem',
+        '4xl': '56rem',
+        '5xl': '64rem',
+        '6xl': '72rem',
+        '7xl': '80rem',
+      },
+      minHeight: {
+        'screen-75': '75vh',
+      },
+      screens: {
+        'xs': '375px',
+        'sm': '640px',
+        'md': '768px',
+        'lg': '1024px',
+        'xl': '1280px',
+        '2xl': '1536px',
+      },
+      backgroundOpacity: {
+        '15': '0.15',
+        '35': '0.35',
+        '65': '0.65',
+      },
+      backdropBlur: {
+        'xs': '2px',
+        'sm': '4px',
+        'md': '8px',
+        'lg': '12px',
+        'xl': '16px',
+        '2xl': '24px',
+        '3xl': '32px',
+      },
+      transitionDuration: {
+        '400': '400ms',
+        '200': '200ms',
+        '300': '300ms',
+        '500': '500ms',
+        '600': '600ms',
+        '700': '700ms',
+        '800': '800ms',
+        '900': '900ms',
+      },
+      transitionTimingFunction: {
+        'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+      borderRadius: {
+        'message': '1.25rem',
+        'btn': '0.75rem',
+        'card': '1.5rem',
+        'xl': '1rem',
+        '2xl': '1.5rem',
+        '3xl': '2rem',
+        '4xl': '2rem',
+        '5xl': '2.5rem',
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    require('tailwind-scrollbar')({ nocompatible: true }),
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/aspect-ratio'),
+  ],
 };

@@ -1,35 +1,135 @@
-import { useNavigate } from 'react-router-dom';
+// Hero.jsx
+import { motion } from 'framer-motion';
+import { useState } from 'react';
+import LoginModal from '../auth/LoginModal';
+import RegisterModal from '../auth/RegisterModal';
 
 const Hero = () => {
-  const navigate = useNavigate();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+
+  const handleRegisterSuccess = () => {
+    setIsRegisterModalOpen(false);
+    setIsLoginModalOpen(true);
+  };
 
   return (
-    <div
-      className="relative h-[70vh] bg-cover bg-center"
-      style={{
-        backgroundImage: `url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80')`, // Replace with your image URL
-      }}
-    >
-      <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-center items-center text-center text-white">
-        <h1 className="text-4xl md:text-5xl font-bold mb-2">
-          Unlock Your Destiny
-        </h1>
-        <p className="text-lg md:text-xl mb-6">
-          with Arabi Jyothisham
-        </p>
-        <button
-          onClick={() => navigate('/register')}
-          className="bg-purple-600 text-white px-6 py-3 rounded-lg mb-4 w-64"
-        >
-          Get Started Now
-        </button>
-        <button
-          onClick={() => navigate('/login')}
-          className="bg-white text-purple-600 px-6 py-3 rounded-lg w-64"
-        >
-          Sign In
-        </button>
+    <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-b from-stone-50 to-white">
+      <div className="absolute inset-0">
+        <img 
+          src="https://images.unsplash.com/photo-1604014237800-1c9102c219da?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=3270&q=80" 
+          alt="Classic Architecture" 
+          className="h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-stone-900/80 via-stone-900/70 to-stone-900/90" />
       </div>
+
+      <div className="relative z-10 min-h-screen">
+        <div className="container mx-auto px-4 py-16 sm:py-20 lg:py-24">
+          <div className="flex flex-col items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="w-full max-w-3xl text-center"
+            >
+              <motion.h1 
+                className="font-serif text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+              >
+                Discover Your Destiny Through{' '}
+                <span className="text-amber-400">Arabic Jyothisham</span>
+              </motion.h1>
+              <motion.p 
+                className="mx-auto mt-4 max-w-2xl text-base text-stone-200 sm:text-lg md:text-xl"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.4 }}
+              >
+                Unlock the ancient wisdom of Arabic astrology and numerology to guide your life's journey
+              </motion.p>
+            </motion.div>
+
+            <motion.div 
+              className="mt-8 flex w-full max-w-sm flex-col items-center justify-center gap-3 sm:mt-10 sm:max-w-md sm:flex-row sm:gap-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.6 }}
+            >
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-2.5 text-white shadow-lg shadow-amber-500/20 transition-all duration-300 hover:from-amber-600 hover:to-amber-700 hover:shadow-xl hover:shadow-amber-500/30 sm:w-auto"
+              >
+                <span className="relative">Sign In</span>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-full w-full transform scale-0 rounded-full bg-white/20 transition-transform duration-300 group-hover:scale-100" />
+                </div>
+              </button>
+              <button
+                onClick={() => setIsRegisterModalOpen(true)}
+                className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-lg border border-white/20 bg-white/10 px-6 py-2.5 text-white backdrop-blur-sm transition-all duration-300 hover:bg-white/20 hover:shadow-lg hover:shadow-white/10 sm:w-auto"
+              >
+                <span className="relative">Get Started</span>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-full w-full transform scale-0 rounded-full bg-white/10 transition-transform duration-300 group-hover:scale-100" />
+                </div>
+              </button>
+            </motion.div>
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 pb-16 sm:pb-20 lg:pb-24">
+          <motion.div 
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.8 }}
+          >
+            {[
+              {
+                title: 'Personalized Readings',
+                description: 'Get detailed insights tailored to your unique astrological profile',
+                icon: '✨'
+              },
+              {
+                title: 'Expert Guidance',
+                description: 'Learn from experienced practitioners of Arabic Jyothisham',
+                icon: '🌟'
+              },
+              {
+                title: 'Life Path Analysis',
+                description: 'Understand your destiny and make informed life decisions',
+                icon: '⭐'
+              }
+            ].map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                className="group relative overflow-hidden rounded-xl bg-white/10 p-4 backdrop-blur-sm transition-all duration-300 hover:bg-white/20 hover:shadow-lg hover:shadow-white/10 sm:p-5"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.8 + index * 0.2 }}
+              >
+                <div className="mb-3 text-3xl sm:text-4xl">{feature.icon}</div>
+                <h3 className="mb-1.5 text-base font-semibold text-white sm:text-lg">{feature.title}</h3>
+                <p className="text-xs text-stone-200 sm:text-sm">{feature.description}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
+      />
+
+      <RegisterModal 
+        isOpen={isRegisterModalOpen} 
+        onClose={() => setIsRegisterModalOpen(false)}
+        onRegisterSuccess={handleRegisterSuccess}
+      />
     </div>
   );
 };
