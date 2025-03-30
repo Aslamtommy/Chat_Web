@@ -25,14 +25,14 @@ const server = http.createServer(app);
 const FRONTEND_URL = process.env.FRONTEND_URL
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_URL,
+    origin: 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   },
 });
 
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: 'http://localhost:5173',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
