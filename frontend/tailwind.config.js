@@ -281,7 +281,7 @@ module.exports = {
   },
   plugins: [
     require("tailwindcss-animate"),
-    require('tailwind-scrollbar')({ nocompatible: true }),
+    require('tailwind-scrollbar'),  // Fixed scrollbar integration
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'),
     require('@tailwindcss/aspect-ratio'),
