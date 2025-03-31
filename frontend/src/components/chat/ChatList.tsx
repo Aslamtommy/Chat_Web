@@ -5,7 +5,7 @@ interface Message {
   _id: string;
   content: string;
   isSelf: boolean;
-  messageType?: 'text' | 'image' | 'voice';
+  messageType?: 'text' | 'image' | 'voice' | 'screenshot'; // Added 'screenshot'
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   duration?: number;
   timestamp?: string;

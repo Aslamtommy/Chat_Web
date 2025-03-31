@@ -4,7 +4,7 @@ import { Play, Pause, Check, CheckCheck } from 'lucide-react';
 interface MessageProps {
   content: string;
   isSelf: boolean;
-  messageType?: 'text' | 'image' | 'voice';
+  messageType?: 'text' | 'image' | 'voice' | 'screenshot'; // Added 'screenshot'
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   duration?: number;
   timestamp?: string;
@@ -85,7 +85,7 @@ const ChatMessage: React.FC<MessageProps> = ({
           <p className="break-words text-sm leading-relaxed">{content}</p>
         )}
 
-        {messageType === 'image' && (
+        {(messageType === 'image' || messageType === 'screenshot') && (
           <img
             src={content}
             alt="chat"

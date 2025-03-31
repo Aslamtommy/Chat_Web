@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import adminService from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DollarSign, X, Check } from 'lucide-react'; // Added icons for payment, cancel, and send
 
 interface Message {
   _id: string;
@@ -24,6 +26,8 @@ interface AdminChatWindowProps {
 
 const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [showToast, setShowToast] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const adminId = useRef<string | null>(null);
 
@@ -33,19 +37,17 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
     }
   }, []);
 
-  // Mark messages as read function
   const markMessagesAsRead = useCallback(() => {
     if (userId && socket) {
       adminService.markMessagesAsRead(userId)
         .then(() => {
           socket.emit('markMessagesAsRead', { chatId: userId });
-          socket.emit('syncUnreadCounts'); // Ensure sidebar updates immediately
+          socket.emit('syncUnreadCounts');
         })
         .catch((error) => console.error('Failed to mark messages as read:', error));
     }
   }, [userId, socket]);
 
-  // Initial load and setup
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token || !userId) {
@@ -71,7 +73,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
         }));
         setMessages(formattedMessages);
         setTimeout(() => scrollToBottom(), 0);
-        markMessagesAsRead(); // Mark all messages as read on load
+        markMessagesAsRead();
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
       }
@@ -90,7 +92,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
           },
         ]);
         setTimeout(() => scrollToBottom(), 0);
-        // Mark as read if it's not from the admin
         if (!message.isSelf) {
           markMessagesAsRead();
         }
@@ -98,11 +99,16 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
     };
 
     socket.on('newMessage', handleNewMessage);
-
-    return () => {
-      socket.off('newMessage', handleNewMessage);
-    };
+    return () => socket.off('newMessage', handleNewMessage);
   }, [userId, socket, scrollToBottom, markMessagesAsRead]);
+
+  const handleRequestScreenshot = () => {
+    if (!userId || !socket) return;
+    socket.emit('requestScreenshot', { userId });
+    setShowToast(true);
+    setShowRequestModal(false);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   const handleSend = useCallback(
     async (messageType: 'text' | 'image' | 'voice', content: string | File) => {
@@ -155,10 +161,10 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
   );
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-black/40 backdrop-blur-sm">
+    <div className="flex-1 flex flex-col h-full bg-black/40 backdrop-blur-sm relative">
       {userId ? (
         <>
-          <div className="p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10">
+          <div className="p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10 relative">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
                 <span className="text-sm font-medium text-amber-500">
@@ -167,13 +173,94 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
               </div>
               <h3 className="text-base font-medium text-white">{username || 'User'}</h3>
             </div>
+            {/* Request Payment Screenshot Button - Top Right */}
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setShowRequestModal(true)}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 
+                bg-gradient-to-r from-amber-600 to-amber-700 text-white px-4 py-2 rounded-xl 
+                shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 
+                flex items-center space-x-2 text-sm font-semibold 
+                disabled:opacity-60 disabled:cursor-not-allowed border border-amber-500/30"
+              disabled={!userId || !socket}
+            >
+              <DollarSign className="w-4 h-4" />
+              <span>Request Payment Screenshot</span>
+            </motion.button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatContainerRef}>
             <ChatList messages={messages} />
           </div>
-          <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-sm">
+          <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-sm relative">
             <ChatInput onSend={handleSend} />
           </div>
+
+          {/* Confirmation Modal */}
+          <AnimatePresence>
+            {showRequestModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 
+                    w-11/12 max-w-md mx-4"
+                >
+                  <h4 className="text-lg font-semibold text-white mb-4">
+                    Request Payment Screenshot
+                  </h4>
+                  <p className="text-white/80 text-sm mb-6">
+                    Are you sure you want to request a payment screenshot from {username || 'this user'}?
+                  </p>
+                  <div className="flex justify-end space-x-3">
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setShowRequestModal(false)}
+                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-2 rounded-lg 
+                        shadow-md hover:from-gray-700 hover:to-gray-800 transition-all duration-300 
+                        flex items-center space-x-2 text-sm font-medium"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>Cancel</span>
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={handleRequestScreenshot}
+                      className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg 
+                        shadow-md hover:from-green-700 hover:to-green-800 transition-all duration-300 
+                        flex items-center space-x-2 text-sm font-medium"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Send</span>
+                    </motion.button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Confirmation Toast */}
+          {showToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="fixed bottom-4 right-4 md:bottom-6 md:right-6 lg:bottom-8 lg:right-8 
+                bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl 
+                shadow-md text-sm font-medium flex items-center space-x-2"
+            >
+              <DollarSign className="w-4 h-4" />
+              <span>Payment screenshot request sent</span>
+            </motion.div>
+          )}
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">

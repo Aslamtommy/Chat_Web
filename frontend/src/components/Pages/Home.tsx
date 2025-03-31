@@ -6,12 +6,14 @@ import ChatList from '../chat/ChatList';
 import ChatInput from '../chat/ChatInput';
 import chatService from '../Services/chatService';
 import ProfileModal from '../Modal/ProfileModal';
+import { motion } from 'framer-motion';
+import { DollarSign } from 'lucide-react'; // Adding lucide-react for the icon
 
 interface Message {
   _id: string;
   content: string;
   isSelf: boolean;
-  messageType?: 'text' | 'image' | 'voice';
+  messageType?: 'text' | 'image' | 'voice' | 'screenshot';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   duration?: number;
   timestamp?: string;
@@ -22,11 +24,13 @@ const Home = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeTab, setActiveTab] = useState<'chats' | 'files' | 'profile'>('chats');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [screenshotRequested, setScreenshotRequested] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<any>(null);
   const navigate = useNavigate();
   const pendingMessages = useRef<Set<string>>(new Set());
   const userId = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
@@ -92,13 +96,17 @@ const Home = () => {
     socketRef.current.on('messageDelivered', handleMessageDelivered);
     socketRef.current.on('messageError', handleMessageError);
 
+    socketRef.current.on('screenshotRequested', () => {
+      setScreenshotRequested(true);
+    });
+
     const fetchChatHistory = async () => {
       try {
         const chat = await chatService.getChatHistory();
         const formattedMessages: Message[] = chat.messages.map((msg: any) => ({
           _id: msg._id.toString(),
           content: msg.content,
-          isSelf: msg.sender_id.toString() === chat.user_id.toString(), // True if sender is the user
+          isSelf: msg.sender_id.toString() === chat.user_id.toString(),
           messageType: msg.message_type,
           status: 'delivered' as const,
           senderId: msg.sender_id.toString(),
@@ -116,19 +124,20 @@ const Home = () => {
       socketRef.current?.off('newMessage', handleNewMessage);
       socketRef.current?.off('messageDelivered', handleMessageDelivered);
       socketRef.current?.off('messageError', handleMessageError);
+      socketRef.current?.off('screenshotRequested');
       socketRef.current?.disconnect();
     };
   }, [navigate, handleNewMessage, handleMessageDelivered, handleMessageError, scrollToBottom]);
 
   const handleSend = useCallback(
-    async (messageType: 'text' | 'image' | 'voice', content: string | File, duration?: number) => {
+    async (messageType: 'text' | 'image' | 'voice' | 'screenshot', content: string | File, duration?: number) => {
       if (!socketRef.current) return;
 
       const tempId = Date.now().toString();
       const tempMessage: Message = {
         _id: tempId,
         content: messageType === 'text' ? (content as string) : 'Uploading...',
-        isSelf: true, // User’s own message
+        isSelf: true,
         messageType,
         status: 'sending',
         senderId: userId.current || '',
@@ -142,7 +151,8 @@ const Home = () => {
 
       try {
         if (messageType !== 'text') {
-          const response = await chatService.sendMessage(messageType, content);
+          const serviceMessageType = messageType === 'screenshot' ? 'image' : messageType;
+          const response = await chatService.sendMessage(serviceMessageType, content);
           const savedMessage = response.messages[response.messages.length - 1];
           setMessages((prev) =>
             prev.map((msg) =>
@@ -151,7 +161,7 @@ const Home = () => {
                     _id: savedMessage._id.toString(),
                     content: savedMessage.content,
                     isSelf: true,
-                    messageType: savedMessage.message_type,
+                    messageType: msg.messageType,
                     status: 'delivered',
                     senderId: userId.current || '',
                     duration: savedMessage.duration || duration,
@@ -161,6 +171,9 @@ const Home = () => {
             )
           );
           pendingMessages.current.delete(tempId);
+          if (messageType === 'screenshot') {
+            setScreenshotRequested(false);
+          }
         } else {
           socketRef.current.emit(
             'sendMessage',
@@ -191,6 +204,26 @@ const Home = () => {
     [scrollToBottom]
   );
 
+  const handleScreenshotUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        return;
+      }
+      handleSend('screenshot', file);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleTabChange = (tab: 'chats' | 'files' | 'profile') => {
     setActiveTab(tab);
     if (tab === 'profile') setIsProfileModalOpen(true);
@@ -200,7 +233,7 @@ const Home = () => {
   return (
     <div className="flex flex-col h-screen bg-black font-serif">
       <ChatHeader />
-      <div className="flex-1 flex flex-col mx-4 mb-4 mt-2 overflow-hidden rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10">
+      <div className="flex-1 flex flex-col mx-4 mb-4 mt-2 overflow-hidden rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10 relative">
         {activeTab === 'chats' && (
           <>
             <div
@@ -211,6 +244,32 @@ const Home = () => {
             </div>
             <div className="border-t border-white/10 bg-black/30 backdrop-blur-md">
               <ChatInput onSend={handleSend} />
+              {screenshotRequested && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-2 flex justify-center"
+                >
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleScreenshotUpload}
+                    className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-5 py-2.5 rounded-xl 
+                      shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 
+                      flex items-center space-x-2 text-sm font-semibold border border-amber-500/20"
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    <span>Upload Payment Screenshot</span>
+                  </motion.button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                </motion.div>
+              )}
             </div>
           </>
         )}
