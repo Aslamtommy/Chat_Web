@@ -106,6 +106,10 @@ io.on('connection', (socket) => {
     if (!isAdmin) return; // Only admins can request screenshots
     io.to(targetUserId).emit('screenshotRequested');
   });
+  socket.on('screenshotUploaded', ({ userId, messageId }) => {
+    io.to(userId).emit('screenshotFulfilled');
+    io.to('admin-room').emit('screenshotFulfilled', { userId, messageId });
+  });
 
   socket.on('markMessagesAsRead', async ({ chatId }) => {
     try {

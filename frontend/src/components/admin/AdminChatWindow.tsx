@@ -3,14 +3,14 @@ import adminService from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DollarSign, X, Check, User } from 'lucide-react'; // Added User icon
+import { DollarSign, X, Check, User } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 
 interface Message {
   _id: string;
   content: string;
   isSelf: boolean;
-  messageType?: 'text' | 'image' | 'voice';
+  messageType?: 'text' | 'image' | 'voice' | 'screenshot';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   senderId: string;
   chatId?: string;
@@ -30,6 +30,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
   const [showToast, setShowToast] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showUserDetails, setShowUserDetails] = useState(false);
+  const [screenshotStatus, setScreenshotStatus] = useState<'none' | 'requested' | 'fulfilled'>('none');
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const adminId = useRef<string | null>(null);
 
@@ -74,6 +75,11 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
           timestamp: msg.timestamp,
         }));
         setMessages(formattedMessages);
+        // Check if there's a recent screenshot to set initial status
+        const hasRecentScreenshot = formattedMessages.some(
+          msg => msg.messageType === 'screenshot' && !msg.isSelf && new Date(msg.timestamp || '').getTime() > Date.now() - 24 * 60 * 60 * 1000
+        );
+        setScreenshotStatus(hasRecentScreenshot ? 'fulfilled' : 'none');
         setTimeout(() => scrollToBottom(), 0);
         markMessagesAsRead();
       } catch (error) {
@@ -87,26 +93,38 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
       if (message.chatId === userId || message.senderId === userId) {
         setMessages((prev) => [
           ...prev,
-          {
-            ...message,
-            status: 'delivered' as const,
-            isSelf: message.senderId === adminId.current,
-          },
+          { ...message, status: 'delivered' as const, isSelf: message.senderId === adminId.current },
         ]);
-        setTimeout(() => scrollToBottom(), 0);
-        if (!message.isSelf) {
-          markMessagesAsRead();
+        if (message.messageType === 'screenshot' && !message.isSelf) {
+          setScreenshotStatus('fulfilled');
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
         }
+        setTimeout(() => scrollToBottom(), 0);
+        if (!message.isSelf) markMessagesAsRead();
+      }
+    };
+
+    const handleScreenshotFulfilled = ({ userId: fulfilledUserId }: { userId: string }) => {
+      if (fulfilledUserId === userId) {
+        setScreenshotStatus('fulfilled');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
       }
     };
 
     socket.on('newMessage', handleNewMessage);
-    return () => socket.off('newMessage', handleNewMessage);
+    socket.on('screenshotFulfilled', handleScreenshotFulfilled);
+    return () => {
+      socket.off('newMessage', handleNewMessage);
+      socket.off('screenshotFulfilled', handleScreenshotFulfilled);
+    };
   }, [userId, socket, scrollToBottom, markMessagesAsRead]);
 
   const handleRequestScreenshot = () => {
     if (!userId || !socket) return;
     socket.emit('requestScreenshot', { userId });
+    setScreenshotStatus('requested');
     setShowToast(true);
     setShowRequestModal(false);
     setTimeout(() => setShowToast(false), 3000);
@@ -128,17 +146,14 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
         timestamp: new Date().toISOString(),
       };
 
-      setMessages((prev) => {
-        const updatedMessages = [...prev, tempMessage];
-        setTimeout(() => scrollToBottom(), 0);
-        return updatedMessages;
-      });
+      setMessages((prev) => [...prev, tempMessage]);
+      scrollToBottom();
 
       try {
         const response = await adminService.sendMessageToUser(userId, messageType, content);
         const savedMessage = response.messages[response.messages.length - 1];
-        setMessages((prev) => {
-          const updatedMessages = prev.map((msg) =>
+        setMessages((prev) =>
+          prev.map((msg) =>
             msg._id === tempId
               ? {
                   ...msg,
@@ -148,10 +163,9 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
                   timestamp: savedMessage.timestamp,
                 }
               : msg
-          );
-          setTimeout(() => scrollToBottom(), 0);
-          return updatedMessages;
-        });
+          )
+        );
+        scrollToBottom();
       } catch (error) {
         console.error('Failed to send message:', error);
         setMessages((prev) =>
@@ -167,42 +181,39 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
       {userId ? (
         <>
           <div className="p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10 relative">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
-                <span className="text-sm font-medium text-amber-500">
-                  {username?.charAt(0).toUpperCase()}
-                </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
+                  <span className="text-sm font-medium text-amber-500">
+                    {username?.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <h3 className="text-base font-medium text-white">{username || 'User'}</h3>
               </div>
-              <h3 className="text-base font-medium text-white">{username || 'User'}</h3>
-            </div>
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-              {/* User Details Button */}
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setShowUserDetails(true)}
-                className="p-2 rounded-xl bg-amber-500/20 text-white hover:bg-amber-500/30 
-                  border border-amber-500/30 transition-all duration-300 flex items-center space-x-2"
-                title="View User Details"
-              >
-                <User className="w-4 h-4" />
-                <span className="text-sm font-medium hidden sm:inline">User Details</span>
-              </motion.button>
-
-              {/* Request Payment Screenshot Button */}
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setShowRequestModal(true)}
-                className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-4 py-2 rounded-xl 
-                  shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 
-                  flex items-center space-x-2 text-sm font-semibold 
-                  disabled:opacity-60 disabled:cursor-not-allowed border border-amber-500/30"
-                disabled={!userId || !socket}
-              >
-                <DollarSign className="w-4 h-4" />
-                <span className="hidden sm:inline">Request Payment Screenshot</span>
-              </motion.button>
+              <div className="flex items-center space-x-2">
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowUserDetails(true)}
+                  className="p-2 rounded-xl bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 transition-all duration-300 flex items-center space-x-2"
+                  title="View User Details"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="text-sm font-medium hidden sm:inline">User Details</span>
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowRequestModal(true)}
+                  className={`bg-gradient-to-r from-amber-600 to-amber-700 text-white px-4 py-2 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/30 ${screenshotStatus === 'fulfilled' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  disabled={screenshotStatus === 'fulfilled' || !userId || !socket}
+                >
+                  <DollarSign className="w-4 h-4" />
+                  <span className="hidden sm:inline">
+                    {screenshotStatus === 'fulfilled' ? 'Screenshot Received' : 'Request Payment Screenshot'}
+                  </span>
+                </motion.button>
+              </div>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatContainerRef}>
@@ -212,7 +223,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
             <ChatInput onSend={handleSend} />
           </div>
 
-          {/* Confirmation Modal */}
           <AnimatePresence>
             {showRequestModal && (
               <motion.div
@@ -225,12 +235,9 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 
-                    w-11/12 max-w-md mx-4"
+                  className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 w-11/12 max-w-md mx-4"
                 >
-                  <h4 className="text-lg font-semibold text-white mb-4">
-                    Request Payment Screenshot
-                  </h4>
+                  <h4 className="text-lg font-semibold text-white mb-4">Request Payment Screenshot</h4>
                   <p className="text-white/80 text-sm mb-6">
                     Are you sure you want to request a payment screenshot from {username || 'this user'}?
                   </p>
@@ -239,9 +246,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => setShowRequestModal(false)}
-                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-2 rounded-lg 
-                        shadow-md hover:from-gray-700 hover:to-gray-800 transition-all duration-300 
-                        flex items-center space-x-2 text-sm font-medium"
+                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-2 rounded-lg shadow-md hover:from-gray-700 hover:to-gray-800 transition-all duration-300 flex items-center space-x-2 text-sm font-medium"
                     >
                       <X className="w-4 h-4" />
                       <span>Cancel</span>
@@ -250,9 +255,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={handleRequestScreenshot}
-                      className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg 
-                        shadow-md hover:from-green-700 hover:to-green-800 transition-all duration-300 
-                        flex items-center space-x-2 text-sm font-medium"
+                      className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md hover:from-green-700 hover:to-green-800 transition-all duration-300 flex items-center space-x-2 text-sm font-medium"
                     >
                       <Check className="w-4 h-4" />
                       <span>Send</span>
@@ -263,22 +266,20 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
             )}
           </AnimatePresence>
 
-          {/* Confirmation Toast */}
-          {showToast && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="fixed bottom-4 right-4 md:bottom-6 md:right-6 lg:bottom-8 lg:right-8 
-                bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl 
-                shadow-md text-sm font-medium flex items-center space-x-2"
-            >
-              <DollarSign className="w-4 h-4" />
-              <span>Payment screenshot request sent</span>
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {showToast && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="fixed bottom-4 right-4 md:bottom-6 md:right-6 lg:bottom-8 lg:right-8 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl shadow-md text-sm font-medium flex items-center space-x-2"
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>{screenshotStatus === 'fulfilled' ? 'Screenshot received' : 'Screenshot request sent'}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* User Details Modal */}
           {showUserDetails && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -290,8 +291,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 
-                  w-11/12 max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
+                className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 w-11/12 max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
               >
                 <div className="flex justify-between items-center mb-6">
                   <h4 className="text-xl font-semibold text-white">User Details</h4>
@@ -309,9 +309,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-white/70 text-lg">
-            {isMobile ? 'Select a user to start chatting' : 'No user selected'}
-          </p>
+          <p className="text-white/70 text-lg">{isMobile ? 'Select a user to start chatting' : 'No user selected'}</p>
         </div>
       )}
     </div>
