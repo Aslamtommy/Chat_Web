@@ -1,18 +1,18 @@
-// AdminChatWindow.tsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import adminService from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
-import AdminUserDetails from './AdminUserDetails';
 
 interface Message {
   _id: string;
   content: string;
-  isAdmin: boolean;
-  messageType: 'text' | 'image' | 'voice';
+  isSelf: boolean;
+  messageType?: 'text' | 'image' | 'voice';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   senderId: string;
-  chatId: string;
+  chatId?: string;
+  duration?: number;
+  timestamp?: string;
 }
 
 interface AdminChatWindowProps {
@@ -25,75 +25,133 @@ interface AdminChatWindowProps {
 const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const adminId = useRef<string | null>(null);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, []);
 
+  // Mark messages as read function
+  const markMessagesAsRead = useCallback(() => {
+    if (userId && socket) {
+      adminService.markMessagesAsRead(userId)
+        .then(() => {
+          socket.emit('markMessagesAsRead', { chatId: userId });
+          socket.emit('syncUnreadCounts'); // Ensure sidebar updates immediately
+        })
+        .catch((error) => console.error('Failed to mark messages as read:', error));
+    }
+  }, [userId, socket]);
+
+  // Initial load and setup
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
-    if (!token || !userId) return;
+    if (!token || !userId) {
+      setMessages([]);
+      return;
+    }
 
     const decoded = JSON.parse(atob(token.split('.')[1]));
     adminId.current = decoded.id;
 
-    socket.on('newMessage', (message: Message) => {
-      if (message.senderId === userId || (message.isAdmin && message.chatId === userId)) {
-        setMessages((prev) => [...prev, { ...message, status: 'delivered' }]);
-        scrollToBottom();
-      }
-    });
-
-    return () => socket.off('newMessage');
-  }, [userId, socket, scrollToBottom]);
-
-  useEffect(() => {
-    if (!userId) {
-      setMessages([]);
-      return;
-    }
     const fetchChatHistory = async () => {
-      const chat = await adminService.getUserChatHistory(userId);
-      setMessages(chat.messages.map((msg: any) => ({
-        _id: msg._id.toString(),
-        content: msg.content,
-        isAdmin: msg.sender_id.toString() !== chat.user_id.toString(),
-        messageType: msg.message_type,
-        status: 'delivered',
-        senderId: msg.sender_id.toString(),
-        chatId: chat._id.toString(),
-      })));
-      scrollToBottom();
+      try {
+        const chat = await adminService.getUserChatHistory(userId);
+        const formattedMessages: Message[] = chat.messages.map((msg: any) => ({
+          _id: msg._id.toString(),
+          content: msg.content,
+          isSelf: msg.sender_id.toString() === adminId.current,
+          messageType: msg.message_type || 'text',
+          status: 'delivered' as const,
+          senderId: msg.sender_id.toString(),
+          chatId: chat._id.toString(),
+          timestamp: msg.timestamp,
+        }));
+        setMessages(formattedMessages);
+        setTimeout(() => scrollToBottom(), 0);
+        markMessagesAsRead(); // Mark all messages as read on load
+      } catch (error) {
+        console.error('Failed to fetch chat history:', error);
+      }
     };
+
     fetchChatHistory();
-  }, [userId, scrollToBottom]);
+
+    const handleNewMessage = (message: Message) => {
+      if (message.chatId === userId || message.senderId === userId) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...message,
+            status: 'delivered' as const,
+            isSelf: message.senderId === adminId.current,
+          },
+        ]);
+        setTimeout(() => scrollToBottom(), 0);
+        // Mark as read if it's not from the admin
+        if (!message.isSelf) {
+          markMessagesAsRead();
+        }
+      }
+    };
+
+    socket.on('newMessage', handleNewMessage);
+
+    return () => {
+      socket.off('newMessage', handleNewMessage);
+    };
+  }, [userId, socket, scrollToBottom, markMessagesAsRead]);
 
   const handleSend = useCallback(
     async (messageType: 'text' | 'image' | 'voice', content: string | File) => {
       if (!userId || !adminId.current) return;
+
       const tempId = Date.now().toString();
       const tempMessage: Message = {
         _id: tempId,
-        content: messageType === 'text' ? content as string : 'Uploading...',
-        isAdmin: true,
+        content: messageType === 'text' ? (content as string) : 'Uploading...',
+        isSelf: true,
         messageType,
         status: 'sending',
         senderId: adminId.current,
         chatId: userId,
+        timestamp: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, tempMessage]);
-      const response = await adminService.sendMessageToUser(userId, messageType, content);
-      const savedMessage = response.messages[response.messages.length - 1];
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === tempId ? { ...msg, _id: savedMessage._id, content: savedMessage.content, status: 'delivered' } : msg
-        )
-      );
-      scrollToBottom();
+
+      setMessages((prev) => {
+        const updatedMessages = [...prev, tempMessage];
+        setTimeout(() => scrollToBottom(), 0);
+        return updatedMessages;
+      });
+
+      try {
+        const response = await adminService.sendMessageToUser(userId, messageType, content);
+        const savedMessage = response.messages[response.messages.length - 1];
+        setMessages((prev) => {
+          const updatedMessages = prev.map((msg) =>
+            msg._id === tempId
+              ? {
+                  ...msg,
+                  _id: savedMessage._id.toString(),
+                  content: savedMessage.content,
+                  status: 'delivered' as const,
+                  timestamp: savedMessage.timestamp,
+                }
+              : msg
+          );
+          setTimeout(() => scrollToBottom(), 0);
+          return updatedMessages;
+        });
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        setMessages((prev) =>
+          prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
+        );
+      }
     },
-    [userId]
+    [userId, scrollToBottom]
   );
 
   return (
@@ -112,7 +170,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatContainerRef}>
             <ChatList messages={messages} />
-            <div ref={messagesEndRef} />
           </div>
           <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-sm">
             <ChatInput onSend={handleSend} />

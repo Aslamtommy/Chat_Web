@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import io from 'socket.io-client';
 import ChatHeader from '../chat/ChatHeader';
 import ChatList from '../chat/ChatList';
 import ChatInput from '../chat/ChatInput';
 import chatService from '../Services/chatService';
-import io from 'socket.io-client';
 import ProfileModal from '../Modal/ProfileModal';
 
 interface Message {
   _id: string;
   content: string;
-  isAdmin: boolean;
+  isSelf: boolean;
   messageType?: 'text' | 'image' | 'voice';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   duration?: number;
@@ -39,7 +39,12 @@ const Home = () => {
 
     setMessages((prev: Message[]): Message[] => {
       if (prev.some((m) => m._id === message._id)) return prev;
-      const updatedMessages = [...prev, { ...message, status: 'delivered' as const }];
+      const newMessage = {
+        ...message,
+        isSelf: message.senderId === userId.current,
+        status: 'delivered' as const,
+      };
+      const updatedMessages = [...prev, newMessage];
       scrollToBottom();
       return updatedMessages;
     });
@@ -67,7 +72,7 @@ const Home = () => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      navigate("/");
+      navigate('/');
       return;
     }
 
@@ -93,7 +98,7 @@ const Home = () => {
         const formattedMessages: Message[] = chat.messages.map((msg: any) => ({
           _id: msg._id.toString(),
           content: msg.content,
-          isAdmin: msg.sender_id.toString() !== chat.user_id.toString(),
+          isSelf: msg.sender_id.toString() === chat.user_id.toString(), // True if sender is the user
           messageType: msg.message_type,
           status: 'delivered' as const,
           senderId: msg.sender_id.toString(),
@@ -123,7 +128,7 @@ const Home = () => {
       const tempMessage: Message = {
         _id: tempId,
         content: messageType === 'text' ? (content as string) : 'Uploading...',
-        isAdmin: false,
+        isSelf: true, // User’s own message
         messageType,
         status: 'sending',
         senderId: userId.current || '',
@@ -137,17 +142,15 @@ const Home = () => {
 
       try {
         if (messageType !== 'text') {
-          // Handle non-text messages via HTTP
           const response = await chatService.sendMessage(messageType, content);
           const savedMessage = response.messages[response.messages.length - 1];
-          
           setMessages((prev) =>
             prev.map((msg) =>
               msg._id === tempId
                 ? {
                     _id: savedMessage._id.toString(),
                     content: savedMessage.content,
-                    isAdmin: false,
+                    isSelf: true,
                     messageType: savedMessage.message_type,
                     status: 'delivered',
                     senderId: userId.current || '',
@@ -159,7 +162,6 @@ const Home = () => {
           );
           pendingMessages.current.delete(tempId);
         } else {
-          // Handle text messages via Socket.io
           socketRef.current.emit(
             'sendMessage',
             { messageType, content: content as string, tempId },
@@ -169,7 +171,7 @@ const Home = () => {
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg._id === tempId
-                      ? { ...msg, ...ack.message, status: 'delivered' }
+                      ? { ...msg, ...ack.message, status: 'delivered', isSelf: true }
                       : msg
                   )
                 );
@@ -231,8 +233,8 @@ const Home = () => {
               key={tab.id}
               onClick={() => handleTabChange(tab.id as 'chats' | 'files' | 'profile')}
               className={`flex flex-col items-center transition-all duration-300 ${
-                activeTab === tab.id 
-                  ? 'text-amber-500 scale-105' 
+                activeTab === tab.id
+                  ? 'text-amber-500 scale-105'
                   : 'text-white/70 hover:text-amber-500/80'
               }`}
             >

@@ -83,6 +83,9 @@ const AdminDashboard = () => {
   const handleBackToUsers = () => {
     setSelectedUserId(null);
     setSelectedUserName(null);
+    if (socketRef.current) {
+      socketRef.current.emit('syncUnreadCounts'); // Ensure latest counts are fetched
+    }
   };
 
   const handleLogout = () => {

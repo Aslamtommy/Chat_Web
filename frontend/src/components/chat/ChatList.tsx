@@ -1,10 +1,10 @@
-import   { forwardRef } from 'react';
+import { forwardRef } from 'react';
 import ChatMessage from './ChatMessage';
 
 interface Message {
   _id: string;
   content: string;
-  isAdmin: boolean;
+  isSelf: boolean;
   messageType?: 'text' | 'image' | 'voice';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   duration?: number;
@@ -22,7 +22,7 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(({ messages }, ref) =
         <ChatMessage
           key={message._id}
           content={message.content}
-          isAdmin={message.isAdmin}
+          isSelf={message.isSelf}
           messageType={message.messageType}
           status={message.status}
           duration={message.duration}

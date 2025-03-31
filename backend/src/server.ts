@@ -22,7 +22,7 @@ dotenv.config();
 
 const app: Express = express();
 const server = http.createServer(app);
-const FRONTEND_URL = process.env.FRONTEND_URL
+const FRONTEND_URL = process.env.FRONTEND_URL;
 const io = new Server(server, {
   cors: {
     origin: 'http://localhost:5173',
@@ -82,7 +82,6 @@ io.on('connection', (socket) => {
   if (isAdmin) {
     socket.join('admin-room');
     console.log(`Admin ${userId} joined admin-room`);
-    console.log(`Triggering initial sync for admin ${userId}`);
     socket.emit('requestSyncUnreadCounts');
   }
 
@@ -96,9 +95,7 @@ io.on('connection', (socket) => {
           const uid = user._id.toString();
           const count = await ChatRepository.getUnreadCount(uid);
           unreadCounts[uid] = count;
-          console.log(`Calculated unread count for ${uid}: ${count}`);
         }
-        console.log('Sending initial unread counts on sync:', unreadCounts);
         socket.emit('initialUnreadCounts', unreadCounts);
       } catch (error) {
         console.error('Error syncing unread counts:', error);
@@ -113,14 +110,11 @@ io.on('connection', (socket) => {
         return;
       }
       
-      console.log(`Received markMessagesAsRead event for chat ${chatId} by admin ${userId}`);
       await ChatRepository.markMessagesAsRead(chatId, userId);
-      
       const unreadCount = await ChatRepository.getUnreadCount(chatId);
-      console.log(`Updated unread count for ${chatId} after markMessagesAsRead: ${unreadCount}`);
       io.to('admin-room').emit('updateUnreadCount', {
         userId: chatId,
-        unreadCount,
+        unreadCount, // Should be 0 if all messages are read
       });
       io.to(chatId).emit('messagesRead', { 
         chatId,
@@ -149,18 +143,8 @@ io.on('connection', (socket) => {
       }
 
       const chatThreadId = isAdmin ? targetUserId : senderId;
-      console.log(`Message from ${senderId} (${isAdmin ? 'admin' : 'user'}) to ${recipientId}`);
 
-      // Only check for duplicates for text messages
-      if (messageType === 'text') {
-        const existingMessage = await ChatRepository.findMessageByContent(chatThreadId, content);
-        if (existingMessage) {
-          console.log(`Duplicate message detected for chat ${chatThreadId}: ${content}`);
-          socket.emit('messageError', { tempId, error: 'Duplicate message detected' });
-          return ack?.({ status: 'error', error: 'Duplicate message' });
-        }
-      }
-
+      // Save the message
       const updatedChat = await ChatService.saveMessage(
         chatThreadId,
         senderId,
@@ -183,7 +167,7 @@ io.on('connection', (socket) => {
         timestamp: newMessage.timestamp,
         status: 'delivered',
         isAdmin: isAdmin,
-        read: false,
+        read: false, // Initially unread
       };
 
       // Emit to all relevant parties
@@ -193,16 +177,27 @@ io.on('connection', (socket) => {
         io.to('admin-room').emit('newMessage', messagePayload);
       }
       
-      // Send delivery confirmation to sender
       socket.emit('messageDelivered', messagePayload);
-      
-      // Update unread counts if needed
+
+      // Update unread count only if the admin isn’t viewing the chat
       if (!isAdmin) {
-        const unreadCount = await ChatRepository.getUnreadCount(senderId);
-        io.to('admin-room').emit('updateUnreadCount', {
-          userId: senderId,
-          unreadCount,
-        });
+        const adminSockets = Array.from(io.sockets.sockets.values()).filter(s => 
+          s.data.user?.role === 'admin' && s.rooms.has(chatThreadId)
+        );
+        if (adminSockets.length === 0) { // No admin is viewing this chat
+          const unreadCount = await ChatRepository.getUnreadCount(chatThreadId);
+          io.to('admin-room').emit('updateUnreadCount', {
+            userId: chatThreadId,
+            unreadCount,
+          });
+        } else {
+          // Admin is viewing, mark as read immediately
+          await ChatRepository.markMessagesAsRead(chatThreadId, adminSockets[0].data.user.id);
+          io.to('admin-room').emit('updateUnreadCount', {
+            userId: chatThreadId,
+            unreadCount: 0,
+          });
+        }
       }
 
       ack?.({ status: 'success', message: messagePayload });
