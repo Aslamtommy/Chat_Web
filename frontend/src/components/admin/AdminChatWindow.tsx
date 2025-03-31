@@ -3,7 +3,8 @@ import adminService from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DollarSign, X, Check } from 'lucide-react'; // Added icons for payment, cancel, and send
+import { DollarSign, X, Check, User } from 'lucide-react'; // Added User icon
+import AdminUserDetails from './AdminUserDetails';
 
 interface Message {
   _id: string;
@@ -28,6 +29,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
   const [messages, setMessages] = useState<Message[]>([]);
   const [showToast, setShowToast] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [showUserDetails, setShowUserDetails] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const adminId = useRef<string | null>(null);
 
@@ -173,21 +175,35 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
               </div>
               <h3 className="text-base font-medium text-white">{username || 'User'}</h3>
             </div>
-            {/* Request Payment Screenshot Button - Top Right */}
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setShowRequestModal(true)}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 
-                bg-gradient-to-r from-amber-600 to-amber-700 text-white px-4 py-2 rounded-xl 
-                shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 
-                flex items-center space-x-2 text-sm font-semibold 
-                disabled:opacity-60 disabled:cursor-not-allowed border border-amber-500/30"
-              disabled={!userId || !socket}
-            >
-              <DollarSign className="w-4 h-4" />
-              <span>Request Payment Screenshot</span>
-            </motion.button>
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+              {/* User Details Button */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setShowUserDetails(true)}
+                className="p-2 rounded-xl bg-amber-500/20 text-white hover:bg-amber-500/30 
+                  border border-amber-500/30 transition-all duration-300 flex items-center space-x-2"
+                title="View User Details"
+              >
+                <User className="w-4 h-4" />
+                <span className="text-sm font-medium hidden sm:inline">User Details</span>
+              </motion.button>
+
+              {/* Request Payment Screenshot Button */}
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setShowRequestModal(true)}
+                className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-4 py-2 rounded-xl 
+                  shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 
+                  flex items-center space-x-2 text-sm font-semibold 
+                  disabled:opacity-60 disabled:cursor-not-allowed border border-amber-500/30"
+                disabled={!userId || !socket}
+              >
+                <DollarSign className="w-4 h-4" />
+                <span className="hidden sm:inline">Request Payment Screenshot</span>
+              </motion.button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatContainerRef}>
             <ChatList messages={messages} />
@@ -259,6 +275,35 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
             >
               <DollarSign className="w-4 h-4" />
               <span>Payment screenshot request sent</span>
+            </motion.div>
+          )}
+
+          {/* User Details Modal */}
+          {showUserDetails && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 
+                  w-11/12 max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
+              >
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="text-xl font-semibold text-white">User Details</h4>
+                  <button
+                    onClick={() => setShowUserDetails(false)}
+                    className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <AdminUserDetails userId={userId} />
+              </motion.div>
             </motion.div>
           )}
         </>
