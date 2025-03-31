@@ -80,44 +80,7 @@ const Hero = () => {
           </div>
         </div>
 
-        <div className="container mx-auto px-4 pb-16 sm:pb-20 lg:pb-24">
-          <motion.div 
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.8 }}
-          >
-            {[
-              {
-                title: 'Personalized Readings',
-                description: 'Get detailed insights tailored to your unique astrological profile',
-                icon: '✨'
-              },
-              {
-                title: 'Expert Guidance',
-                description: 'Learn from experienced practitioners of Arabic Jyothisham',
-                icon: '🌟'
-              },
-              {
-                title: 'Life Path Analysis',
-                description: 'Understand your destiny and make informed life decisions',
-                icon: '⭐'
-              }
-            ].map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                className="group relative overflow-hidden rounded-xl bg-white/10 p-4 backdrop-blur-sm transition-all duration-300 hover:bg-white/20 hover:shadow-lg hover:shadow-white/10 sm:p-5"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.8 + index * 0.2 }}
-              >
-                <div className="mb-3 text-3xl sm:text-4xl">{feature.icon}</div>
-                <h3 className="mb-1.5 text-base font-semibold text-white sm:text-lg">{feature.title}</h3>
-                <p className="text-xs text-stone-200 sm:text-sm">{feature.description}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
+        
       </div>
 
       <LoginModal 
