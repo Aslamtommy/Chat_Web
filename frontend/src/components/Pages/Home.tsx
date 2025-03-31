@@ -73,11 +73,18 @@ const Home = () => {
     socketRef.current.on('connect', () => {
       const decoded = jwtDecode<{ id: string }>(token);
       userId.current = decoded.id;
+      console.log(`User ${userId.current} connected`);
     });
 
     socketRef.current.on('newMessage', handleNewMessage);
-    socketRef.current.on('screenshotRequested', () => setScreenshotRequested(true));
+
+    socketRef.current.on('screenshotRequested', () => {
+      console.log('Screenshot request received from admin');
+      setScreenshotRequested(true);
+    });
+
     socketRef.current.on('screenshotFulfilled', () => {
+      console.log('Screenshot fulfilled');
       setScreenshotRequested(false);
       localStorage.removeItem('screenshotRequested');
     });
@@ -85,19 +92,33 @@ const Home = () => {
     const fetchChatHistory = async () => {
       try {
         const chat = await chatService.getChatHistory();
-        const formattedMessages: Message[] = chat.messages.map((msg: any) => ({
-          _id: msg._id.toString(),
-          content: msg.content,
-          isSelf: msg.sender_id.toString() === chat.user_id.toString(),
-          messageType: msg.message_type,
-          status: 'delivered' as const,
-          senderId: msg.sender_id.toString(),
-          timestamp: msg.timestamp,
-        }));
+        if (!chat || !chat.messages) {
+          console.log('No chat history found');
+          setMessages([]);
+          return;
+        }
+
+        const formattedMessages: Message[] = chat.messages.map((msg: any) => {
+          if (!msg || !msg._id || !msg.sender_id) {
+            console.warn('Invalid message format:', msg);
+            return null;
+          }
+          return {
+            _id: msg._id.toString(),
+            content: msg.content || '',
+            isSelf: msg.sender_id.toString() === userId.current,
+            messageType: msg.message_type || 'text',
+            status: 'delivered' as const,
+            senderId: msg.sender_id.toString(),
+            timestamp: msg.timestamp || new Date().toISOString(),
+          };
+        }).filter((msg: any): msg is Message => msg !== null);
+
         setMessages(formattedMessages);
         scrollToBottom();
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
+        setMessages([]);
       }
     };
     fetchChatHistory();

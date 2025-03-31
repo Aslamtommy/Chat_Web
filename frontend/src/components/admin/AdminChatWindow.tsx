@@ -16,6 +16,7 @@ interface Message {
   chatId?: string;
   duration?: number;
   timestamp?: string;
+  read: boolean;
 }
 
 interface AdminChatWindowProps {
@@ -73,6 +74,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
           senderId: msg.sender_id.toString(),
           chatId: chat._id.toString(),
           timestamp: msg.timestamp,
+          read: true,
         }));
         setMessages(formattedMessages);
         // Check if there's a recent screenshot to set initial status
@@ -91,17 +93,23 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
 
     const handleNewMessage = (message: Message) => {
       if (message.chatId === userId || message.senderId === userId) {
+        const isAdminMessage = message.senderId === adminId.current;
         setMessages((prev) => [
           ...prev,
-          { ...message, status: 'delivered' as const, isSelf: message.senderId === adminId.current },
+          { 
+            ...message, 
+            status: 'delivered' as const, 
+            isSelf: isAdminMessage,
+            read: isAdminMessage // Admin messages are always marked as read
+          },
         ]);
-        if (message.messageType === 'screenshot' && !message.isSelf) {
+        if (message.messageType === 'screenshot' && !isAdminMessage) {
           setScreenshotStatus('fulfilled');
           setShowToast(true);
           setTimeout(() => setShowToast(false), 3000);
         }
         setTimeout(() => scrollToBottom(), 0);
-        if (!message.isSelf) markMessagesAsRead();
+        if (!isAdminMessage) markMessagesAsRead();
       }
     };
 
@@ -144,6 +152,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
         senderId: adminId.current,
         chatId: userId,
         timestamp: new Date().toISOString(),
+        read: true,
       };
 
       setMessages((prev) => [...prev, tempMessage]);
@@ -161,6 +170,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
                   content: savedMessage.content,
                   status: 'delivered' as const,
                   timestamp: savedMessage.timestamp,
+                  read: true,
                 }
               : msg
           )

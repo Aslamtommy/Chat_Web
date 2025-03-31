@@ -15,4 +15,9 @@ const userSchema = new Schema<IUser>({
   district: { type: String, required: true },
 });
 
+// Add indexes for frequently queried fields
+userSchema.index({ email: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ username: 1 });
+
 export default model<IUser>('User', userSchema);

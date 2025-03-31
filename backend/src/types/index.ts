@@ -19,7 +19,7 @@ export interface IMessage {
   message_type: 'text' | 'image' | 'voice';
   content: string;
   timestamp?: Date;
-  read_by_admin: boolean; // Changed to required with default false in schema
+  read_by_admin?: boolean; // Changed to required with default false in schema
 }
 
 export interface IChatThread extends Document {

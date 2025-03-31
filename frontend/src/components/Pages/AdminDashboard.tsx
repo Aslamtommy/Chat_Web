@@ -11,16 +11,13 @@ const AdminDashboard = () => {
   const [selectedUserName, setSelectedUserName] = useState<string | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const socketRef = useRef<any>(null);
-  const hasSyncedRef = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const checkMobileView = () => {
       const mobile = window.innerWidth < 768;
       setIsMobileView(mobile);
-      if (!mobile) setSidebarOpen(false);
     };
     
     checkMobileView();
@@ -40,14 +37,13 @@ const AdminDashboard = () => {
         auth: { token },
         reconnection: true,
         reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
       });
 
       socketRef.current.on('connect', () => {
         setIsSocketConnected(true);
-        if (!hasSyncedRef.current) {
-          socketRef.current.emit('syncUnreadCounts');
-          hasSyncedRef.current = true;
-        }
+        console.log('Admin socket connected');
+        socketRef.current.emit('syncUnreadCounts');
       });
 
       socketRef.current.on('connect_error', (error: any) => {
@@ -56,8 +52,12 @@ const AdminDashboard = () => {
       });
 
       socketRef.current.on('disconnect', () => {
+        console.log('Admin socket disconnected');
         setIsSocketConnected(false);
-        hasSyncedRef.current = false;
+      });
+
+      socketRef.current.on('initialUnreadCounts', (unreadCounts: any) => {
+        console.log('Received initial unread counts in AdminDashboard:', unreadCounts);
       });
     }
 
@@ -84,7 +84,7 @@ const AdminDashboard = () => {
     setSelectedUserId(null);
     setSelectedUserName(null);
     if (socketRef.current) {
-      socketRef.current.emit('syncUnreadCounts'); // Ensure latest counts are fetched
+      socketRef.current.emit('syncUnreadCounts');
     }
   };
 

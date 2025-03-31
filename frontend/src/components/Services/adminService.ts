@@ -12,32 +12,14 @@ const adminService = {
   getAllUsers: async () => {
     const token = localStorage.getItem('adminToken');
     if (!token) throw new Error('No admin token found. Please log in.');
-    const response: any = await axios.get(`${API_URL}/users`, {
+    
+    // Get users with their last message in a single API call
+    const response: any = await axios.get(`${API_URL}/users/with-last-message`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    
     if (!response.data.success) throw new Error(response.data.error || 'Failed to fetch users');
-
-    const users = response.data.data;
-    const usersWithLastMessage = await Promise.all(
-      users.map(async (user: any) => {
-        try {
-          const chat = await adminService.getUserChatHistory(user._id);
-          const lastMessage = chat.messages[chat.messages.length - 1];
-          return {
-            ...user,
-            lastMessageTimestamp: lastMessage ? lastMessage.timestamp : null,
-          };
-        } catch (error) {
-          return { ...user, lastMessageTimestamp: null };
-        }
-      })
-    );
-
-    return usersWithLastMessage.sort((a: any, b: any) => {
-      if (!a.lastMessageTimestamp) return 1;
-      if (!b.lastMessageTimestamp) return -1;
-      return new Date(b.lastMessageTimestamp).getTime() - new Date(a.lastMessageTimestamp).getTime();
-    });
+    return response.data.data;
   },
 
   getUserById: async (userId: string) => {
@@ -83,9 +65,9 @@ const adminService = {
     return response.data.data;
   },
 
-  getUnreadCounts: async (): Promise<{ [userId: string]: number }> => {
+  getUnreadCounts: async () => {
     const token = localStorage.getItem('adminToken');
-    if (!token) throw new Error('No admin token found');
+    if (!token) throw new Error('No admin token found. Please log in.');
     const response: any = await axios.get(`${API_URL}/chats/unread-counts`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -95,13 +77,13 @@ const adminService = {
 
   markMessagesAsRead: async (userId: string) => {
     const token = localStorage.getItem('adminToken');
-    if (!token) throw new Error('No admin token found');
+    if (!token) throw new Error('No admin token found. Please log in.');
     const response: any = await axios.post(`${API_URL}/chats/user/${userId}/mark-read`, {}, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.data.success) throw new Error(response.data.error || 'Failed to mark messages as read');
     return response.data.data;
-  },
+  }
 };
 
 export default adminService;

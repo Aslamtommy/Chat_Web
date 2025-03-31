@@ -11,6 +11,7 @@ const router = express.Router();
 
 router.post('/auth/login', AdminAuthController.adminLogin);
 router.get('/users', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, AdminAuthController.getUsers);
+router.get('/users/with-last-message', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, AdminAuthController.getUsersWithLastMessage);
 router.get('/users/:id', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, AdminAuthController.getUserById);
 router.get('/chats', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, AdminChatController.getAllChats);
 router.get('/chats/user/:userId', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, validateUserId as RequestHandler, AdminChatController.getUserChatHistory);

@@ -3,6 +3,7 @@ import ChatService from '../services/ChatService';
 import StorageService from '../services/StorageService';
 import { io } from '../server';
 import ChatRepository from '../repositories/ChatRepository';
+
 class UserChatController {
   async getMyChatHistory(req: Request, res: Response): Promise<void> {
     try {

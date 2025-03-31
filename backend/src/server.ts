@@ -22,7 +22,6 @@ dotenv.config();
 
 const app: Express = express();
 const server = http.createServer(app);
-const FRONTEND_URL = process.env.FRONTEND_URL;
 const io = new Server(server, {
   cors: {
     origin: 'http://localhost:5173',
@@ -82,7 +81,25 @@ io.on('connection', (socket) => {
   if (isAdmin) {
     socket.join('admin-room');
     console.log(`Admin ${userId} joined admin-room`);
-    socket.emit('requestSyncUnreadCounts');
+    
+    // Immediately sync unread counts for admin on connection
+    (async () => {
+      try {
+        console.log(`Syncing unread counts for admin ${userId} on connection`);
+        const allUsers = await mongoose.model('User').find({ role: 'user' });
+        const unreadCounts: { [key: string]: number } = {};
+        
+        for (const user of allUsers) {
+          const uid = user._id.toString();
+          const count = await ChatRepository.getUnreadCount(uid);
+          unreadCounts[uid] = count;
+        }
+        
+        socket.emit('initialUnreadCounts', unreadCounts);
+      } catch (error) {
+        console.error('Error syncing unread counts on connection:', error);
+      }
+    })();
   }
 
   if (isAdmin) {
@@ -91,21 +108,25 @@ io.on('connection', (socket) => {
         console.log(`Syncing unread counts for admin ${userId}`);
         const allUsers = await mongoose.model('User').find({ role: 'user' });
         const unreadCounts: { [key: string]: number } = {};
+        
         for (const user of allUsers) {
           const uid = user._id.toString();
           const count = await ChatRepository.getUnreadCount(uid);
           unreadCounts[uid] = count;
         }
+        
         socket.emit('initialUnreadCounts', unreadCounts);
       } catch (error) {
         console.error('Error syncing unread counts:', error);
       }
     });
   }
+
   socket.on('requestScreenshot', ({ userId: targetUserId }) => {
-    if (!isAdmin) return; // Only admins can request screenshots
+    if (!isAdmin) return;
     io.to(targetUserId).emit('screenshotRequested');
   });
+
   socket.on('screenshotUploaded', ({ userId, messageId }) => {
     io.to(userId).emit('screenshotFulfilled');
     io.to('admin-room').emit('screenshotFulfilled', { userId, messageId });
@@ -122,7 +143,7 @@ io.on('connection', (socket) => {
       const unreadCount = await ChatRepository.getUnreadCount(chatId);
       io.to('admin-room').emit('updateUnreadCount', {
         userId: chatId,
-        unreadCount, // Should be 0 if all messages are read
+        unreadCount,
       });
       io.to(chatId).emit('messagesRead', { 
         chatId,
@@ -138,21 +159,13 @@ io.on('connection', (socket) => {
     try {
       const senderId = socket.data.user.id;
       const senderRole = socket.data.user.role;
+      const isAdmin = senderRole === 'admin';
+      const chatThreadId = isAdmin ? targetUserId : senderId;
 
       if (!['text', 'image', 'voice'].includes(messageType)) {
         throw new Error('Invalid message type');
       }
 
-      let recipientId = targetUserId;
-      if (!recipientId && !isAdmin) {
-        const admin = await mongoose.model('User').findOne({ role: 'admin' });
-        if (!admin) throw new Error('No admin available');
-        recipientId = admin._id.toString();
-      }
-
-      const chatThreadId = isAdmin ? targetUserId : senderId;
-
-      // Save the message
       const updatedChat = await ChatService.saveMessage(
         chatThreadId,
         senderId,
@@ -161,9 +174,9 @@ io.on('connection', (socket) => {
       );
 
       const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
-      if (!newMessage._id) {
-        console.log('Message not saved properly');
-        return ack?.({ status: 'error', error: 'Message not saved' });
+      if (!newMessage || !newMessage._id) {
+        console.error('No valid message or message ID found.');
+        return ack?.({ status: 'error', error: 'Message ID is missing or invalid' });
       }
 
       const messagePayload = {
@@ -174,32 +187,24 @@ io.on('connection', (socket) => {
         messageType: newMessage.message_type,
         timestamp: newMessage.timestamp,
         status: 'delivered',
-        isAdmin: isAdmin,
-        read: false, // Initially unread
+        isAdmin,
+        read: isAdmin ? true : false,
       };
 
-      // Emit to all relevant parties
       if (isAdmin) {
         io.to(targetUserId).emit('newMessage', messagePayload);
       } else {
         io.to('admin-room').emit('newMessage', messagePayload);
-      }
-      
-      socket.emit('messageDelivered', messagePayload);
-
-      // Update unread count only if the admin isn’t viewing the chat
-      if (!isAdmin) {
         const adminSockets = Array.from(io.sockets.sockets.values()).filter(s => 
           s.data.user?.role === 'admin' && s.rooms.has(chatThreadId)
         );
-        if (adminSockets.length === 0) { // No admin is viewing this chat
+        if (adminSockets.length === 0) {
           const unreadCount = await ChatRepository.getUnreadCount(chatThreadId);
           io.to('admin-room').emit('updateUnreadCount', {
             userId: chatThreadId,
             unreadCount,
           });
         } else {
-          // Admin is viewing, mark as read immediately
           await ChatRepository.markMessagesAsRead(chatThreadId, adminSockets[0].data.user.id);
           io.to('admin-room').emit('updateUnreadCount', {
             userId: chatThreadId,
@@ -207,6 +212,7 @@ io.on('connection', (socket) => {
           });
         }
       }
+      socket.emit('messageDelivered', messagePayload);
 
       ack?.({ status: 'success', message: messagePayload });
     } catch (error: any) {
