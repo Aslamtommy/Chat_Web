@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Send, Paperclip, Pause, X } from 'lucide-react';
+import { Mic, Send, Paperclip } from 'lucide-react';
 
 interface ChatInputProps {
   onSend: (
@@ -13,21 +13,18 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [, forceUpdate] = useState(0); // Dummy state to force re-render
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const blobToFile = (blob: Blob, fileName: string): File => {
-    return new File([blob], fileName, { type: 'audio/mpeg' });
-  };
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -36,48 +33,47 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mpeg' });
-        setAudioBlob(audioBlob);
-        audioChunksRef.current = [];
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+        onSend('voice', audioFile, duration);
+        stream.getTracks().forEach((track) => track.stop());
       };
 
-      mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start();
       setIsRecording(true);
       setDuration(0);
 
+      // Clear any existing timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+
       timerRef.current = setInterval(() => {
-        setDuration((prev) => prev + 1);
+        setDuration((prev) => {
+          const newDuration = prev + 1;
+          console.log('Timer tick, duration:', newDuration); // Debug log
+          forceUpdate(newDuration); // Force re-render
+          return newDuration;
+        });
       }, 1000);
+
+      console.log('Recording started');
     } catch (error) {
       console.error('Error starting recording:', error);
+      alert('Failed to access microphone. Please allow microphone permissions.');
       setIsRecording(false);
     }
   };
 
-  const stopRecording = (shouldSend: boolean = false) => {
+  const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
       setIsRecording(false);
-
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-
-      if (shouldSend && audioBlob) {
-        sendVoiceMessage();
-      }
-    }
-  };
-
-  const sendVoiceMessage = () => {
-    if (audioBlob) {
-      const audioFile = blobToFile(audioBlob, `voice_${Date.now()}.mp3`);
-      onSend('voice', audioFile, duration);
-      setAudioBlob(null);
-      setDuration(0);
+      console.log('Recording stopped, final duration:', duration);
     }
   };
 
@@ -109,24 +105,17 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const handleRecordClick = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  };
-
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stream?.getTracks().forEach(track => track.stop());
+      if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, []);
+  }, [isRecording]);
 
   return (
     <div className="p-4 bg-black/20 backdrop-blur-sm border-t border-white/10">
@@ -149,22 +138,21 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
 
         <div className="flex-1 relative">
           {isRecording ? (
-            <div className="flex items-center justify-between bg-white/5 px-4 py-2 rounded-xl">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-white">{formatDuration(duration)}</span>
-              </div>
+            <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-xl">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-white text-sm">
+                {formatDuration(duration)}
+              </span>
               <button
                 type="button"
-                onClick={() => stopRecording()}
-                className="text-white hover:text-red-400 transition-colors"
+                onClick={stopRecording}
+                className="bg-amber-500 hover:bg-amber-600 text-white p-2 rounded-full transition-colors ml-auto"
               >
-                <X className="w-5 h-5" />
+                <Send className="w-4 h-4" />
               </button>
             </div>
           ) : (
             <input
-              ref={inputRef}
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -175,39 +163,21 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
         </div>
 
         <div className="flex items-center">
-          {isRecording ? (
+          {isRecording ? null : message.trim() ? (
             <button
-              type="button"
-              onClick={() => stopRecording(true)}
+              type="submit"
               className="bg-amber-500 hover:bg-amber-600 text-white p-2 rounded-full transition-colors"
             >
               <Send className="w-4 h-4" />
             </button>
           ) : (
-            <>
-              {message.trim() ? (
-                <button
-                  type="submit"
-                  className="bg-amber-500 hover:bg-amber-600 text-white p-2 rounded-full transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className={`p-2 rounded-full transition-colors ${
-                    isRecording ? 'bg-amber-500/20' : 'bg-transparent'
-                  }`}
-                  onClick={handleRecordClick}
-                >
-                  {isRecording ? (
-                    <Pause className="w-5 h-5 text-amber-500" />
-                  ) : (
-                    <Mic className="w-5 h-5 text-amber-500" />
-                  )}
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              onClick={startRecording}
+              className="p-2 rounded-full transition-colors bg-transparent"
+            >
+              <Mic className="w-5 h-5 text-amber-500" />
+            </button>
           )}
         </div>
       </form>

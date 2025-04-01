@@ -1,66 +1,60 @@
 import React, { useState, useRef } from 'react';
 
 interface VoiceRecorderProps {
-  onStop: (audioBlob: Blob, duration: number) => void;
+  onRecordingComplete: (audioBlob: Blob, duration: number) => void;
 }
 
-const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onStop }) => {
-  const [recording, setRecording] = useState(false);
+const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onRecordingComplete }) => {
+  const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); // Use webm for broader compatibility
       mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      const audioChunks: Blob[] = [];
 
-      mediaRecorder.addEventListener('dataavailable', (event) => {
+      mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+          audioChunks.push(event.data);
         }
-      });
+      };
 
-      mediaRecorder.addEventListener('stop', () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mpeg' });
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
         const duration = (Date.now() - startTimeRef.current) / 1000;
-        onStop(audioBlob, duration);
-      });
+        onRecordingComplete(audioBlob, duration);
+        stream.getTracks().forEach((track) => track.stop()); // Clean up stream
+      };
 
       mediaRecorder.start();
       startTimeRef.current = Date.now();
-      setRecording(true);
+      setIsRecording(true);
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('Error starting recording:', error);
+      alert('Failed to access microphone. Please allow microphone permissions.');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && recording) {
+    if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      setRecording(false);
+      setIsRecording(false);
     }
   };
 
   return (
     <div>
-      {recording ? (
-        <button
-          onClick={stopRecording}
-          className="bg-red-500 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          Stop Recording
-        </button>
-      ) : (
-        <button
-          onClick={startRecording}
-          className="bg-green-500 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          Record Voice
-        </button>
-      )}
+      <button
+        onClick={isRecording ? stopRecording : startRecording}
+        className={`p-2 rounded-full transition-colors ${
+          isRecording ? 'bg-red-500' : 'bg-green-500'
+        } text-white`}
+      >
+        {isRecording ? 'Stop' : 'Record'}
+      </button>
     </div>
   );
 };
