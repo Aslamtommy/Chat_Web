@@ -107,21 +107,29 @@ const Home = () => {
             };
           })
           .filter((msg: any): msg is Message => msg !== null)
-          .sort((a:any, b:any) => new Date(b.timestamp || '').getTime() - new Date(a.timestamp || '').getTime());
+          // Sort messages in ascending order (oldest first) so newest messages are at the bottom
+          .sort((a:any, b:any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
         setMessages(formattedMessages);
-        scrollToBottom();
+        // Ensure scroll to bottom happens after messages are rendered
+        setTimeout(scrollToBottom, 0);
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
         setMessages([]);
       }
     };
+
     fetchChatHistory();
 
     return () => {
       socketRef.current?.disconnect();
     };
   }, [navigate, handleNewMessage, scrollToBottom]);
+
+  // Ensure scroll to bottom whenever messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
   const handleSend = useCallback(
     async (messageType: 'text' | 'image' | 'voice' | 'screenshot', content: string | File, duration?: number) => {
