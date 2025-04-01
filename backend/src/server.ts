@@ -32,7 +32,7 @@ const io = new Server(server, {
 });
 
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin:FRONTEND_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
