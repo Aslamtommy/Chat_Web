@@ -24,6 +24,8 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   const [error, setError] = useState<string | null>(null);
   const previousSelectedUserId = useRef<string | null>(null);
   const debounceTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
+  const hasSynced = useRef(false);
+  const socketConnected = useRef(false);
 
   const debouncedSearch = useCallback((query: string) => {
     if (debounceTimeout.current) {
@@ -34,20 +36,25 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     }, 300);
   }, []);
 
+  const syncUnreadCounts = useCallback(() => {
+    if (socketConnected.current && !hasSynced.current) {
+      socket.emit('syncUnreadCounts');
+    }
+  }, [socket]);
+
   useEffect(() => {
     const fetchUserList = async () => {
       try {
         setIsLoading(true);
         setError(null);
         const userList = await adminService.getAllUsers();
-        setUsers(
-          userList.map((user: any) => ({
-            _id: user._id,
-            username: user.username,
-            lastMessageTimestamp: user.lastMessageTimestamp || null,
-            unreadCount: 0, // Initial count, updated by socket
-          }))
-        );
+        const initialUsers = userList.map((user: any) => ({
+          _id: user._id,
+          username: user.username,
+          lastMessageTimestamp: user.lastMessageTimestamp || null,
+          unreadCount: 0,
+        }));
+        setUsers(initialUsers);
       } catch (err) {
         setError('Failed to load users');
         console.error('Error fetching users:', err);
@@ -66,9 +73,11 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
           unreadCount: unreadCounts[user._id] || 0,
         }))
       );
+      hasSynced.current = true;
     };
 
     const handleUpdateUnreadCount = ({ userId, unreadCount }: { userId: string; unreadCount: number }) => {
+      console.log('Updating unread count for', userId, 'to', unreadCount);
       setUsers((prev) =>
         prev.map((user) =>
           user._id === userId && selectedUserId !== userId
@@ -78,42 +87,69 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       );
     };
 
+    const handleConnect = () => {
+      console.log('Socket connected');
+      socketConnected.current = true;
+      syncUnreadCounts();
+    };
+
+    const handleDisconnect = () => {
+      console.log('Socket disconnected');
+      socketConnected.current = false;
+      hasSynced.current = false;
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
     socket.on('initialUnreadCounts', handleInitialUnreadCounts);
     socket.on('updateUnreadCount', handleUpdateUnreadCount);
 
-    // Trigger sync on mount
-    socket.emit('syncUnreadCounts');
+    // Initial sync attempt
+    if (socket.connected) {
+      socketConnected.current = true;
+      syncUnreadCounts();
+    }
 
     return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
       socket.off('initialUnreadCounts', handleInitialUnreadCounts);
       socket.off('updateUnreadCount', handleUpdateUnreadCount);
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current);
       }
     };
-  }, [socket, selectedUserId]);
+  }, [socket, selectedUserId, syncUnreadCounts]);
 
   useEffect(() => {
     if (previousSelectedUserId.current && !selectedUserId) {
-      socket.emit('syncUnreadCounts');
+      syncUnreadCounts();
     }
     previousSelectedUserId.current = selectedUserId;
-  }, [selectedUserId, socket]);
+
+    if (selectedUserId) {
+      setUsers((prev) =>
+        prev.map((user) =>
+          user._id === selectedUserId ? { ...user, unreadCount: 0 } : user
+        )
+      );
+    }
+  }, [selectedUserId, syncUnreadCounts]);
 
   const handleUserClick = async (userId: string) => {
-    const user = users.find(u => u._id === userId);
-    if (user?.unreadCount && user.unreadCount > 0) {
-      try {
+    try {
+      const user = users.find(u => u._id === userId);
+      if (user?.unreadCount && user.unreadCount > 0) {
         await adminService.markMessagesAsRead(userId);
         socket.emit('markMessagesAsRead', { chatId: userId });
         setUsers((prev) =>
           prev.map((u) => (u._id === userId ? { ...u, unreadCount: 0 } : u))
         );
-      } catch (error) {
-        console.error('Error marking messages as read:', error);
       }
+      onSelectUser(userId);
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
     }
-    onSelectUser(userId);
   };
 
   const filteredUsers = users.filter((user) =>

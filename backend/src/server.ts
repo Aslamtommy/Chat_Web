@@ -2,7 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import http from 'http';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import authRoutes from './routes/auth';
 import chatRoutes from './routes/chat';
@@ -59,7 +59,7 @@ mongoose.connect(mongoUri)
     process.exit(1);
   });
 
-io.use((socket, next) => {
+io.use((socket: Socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error('Authentication error: No token provided'));
   try {
@@ -71,56 +71,43 @@ io.use((socket, next) => {
   }
 });
 
-io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.data.user.id} (${socket.data.user.role})`);
-  
+const syncUnreadCounts = async (socket: Socket) => {
+  try {
+    const allUsers = await mongoose.model('User').find({ role: 'user' });
+    const unreadCounts: { [key: string]: number } = {};
+    
+    for (const user of allUsers) {
+      const uid = user._id.toString();
+      const count = await ChatRepository.getUnreadCount(uid);
+      unreadCounts[uid] = count;
+    }
+    
+    console.log('Sending unread counts to admin:', unreadCounts);
+    socket.emit('initialUnreadCounts', unreadCounts);
+  } catch (error) {
+    console.error('Error syncing unread counts:', error);
+  }
+};
+
+io.on('connection', (socket: Socket) => {
   const userId = socket.data.user.id;
   const isAdmin = socket.data.user.role === 'admin';
+  
+  console.log(`User connected: ${userId} (${socket.data.user.role})`);
   
   socket.join(userId);
   if (isAdmin) {
     socket.join('admin-room');
     console.log(`Admin ${userId} joined admin-room`);
-    
-    // Immediately sync unread counts for admin on connection
-    (async () => {
-      try {
-        console.log(`Syncing unread counts for admin ${userId} on connection`);
-        const allUsers = await mongoose.model('User').find({ role: 'user' });
-        const unreadCounts: { [key: string]: number } = {};
-        
-        for (const user of allUsers) {
-          const uid = user._id.toString();
-          const count = await ChatRepository.getUnreadCount(uid);
-          unreadCounts[uid] = count;
-        }
-        
-        socket.emit('initialUnreadCounts', unreadCounts);
-      } catch (error) {
-        console.error('Error syncing unread counts on connection:', error);
-      }
-    })();
+    syncUnreadCounts(socket); // Sync immediately on connection
   }
 
-  if (isAdmin) {
-    socket.on('syncUnreadCounts', async () => {
-      try {
-        console.log(`Syncing unread counts for admin ${userId}`);
-        const allUsers = await mongoose.model('User').find({ role: 'user' });
-        const unreadCounts: { [key: string]: number } = {};
-        
-        for (const user of allUsers) {
-          const uid = user._id.toString();
-          const count = await ChatRepository.getUnreadCount(uid);
-          unreadCounts[uid] = count;
-        }
-        
-        socket.emit('initialUnreadCounts', unreadCounts);
-      } catch (error) {
-        console.error('Error syncing unread counts:', error);
-      }
-    });
-  }
+  socket.on('syncUnreadCounts', () => {
+    if (isAdmin) {
+      console.log(`Admin ${userId} requested unread count sync`);
+      syncUnreadCounts(socket);
+    }
+  });
 
   socket.on('requestScreenshot', ({ userId: targetUserId }) => {
     if (!isAdmin) return;
@@ -134,13 +121,12 @@ io.on('connection', (socket) => {
 
   socket.on('markMessagesAsRead', async ({ chatId }) => {
     try {
-      if (!isAdmin) {
-        console.log(`Non-admin ${userId} attempted to mark messages as read`);
-        return;
-      }
+      if (!isAdmin) return;
       
       await ChatRepository.markMessagesAsRead(chatId, userId);
       const unreadCount = await ChatRepository.getUnreadCount(chatId);
+      
+      console.log(`Messages marked as read for chat ${chatId}, new count: ${unreadCount}`);
       io.to('admin-room').emit('updateUnreadCount', {
         userId: chatId,
         unreadCount,
@@ -175,8 +161,7 @@ io.on('connection', (socket) => {
 
       const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
       if (!newMessage || !newMessage._id) {
-        console.error('No valid message or message ID found.');
-        return ack?.({ status: 'error', error: 'Message ID is missing or invalid' });
+        throw new Error('Message ID is missing or invalid');
       }
 
       const messagePayload = {
@@ -195,25 +180,15 @@ io.on('connection', (socket) => {
         io.to(targetUserId).emit('newMessage', messagePayload);
       } else {
         io.to('admin-room').emit('newMessage', messagePayload);
-        const adminSockets = Array.from(io.sockets.sockets.values()).filter(s => 
-          s.data.user?.role === 'admin' && s.rooms.has(chatThreadId)
-        );
-        if (adminSockets.length === 0) {
-          const unreadCount = await ChatRepository.getUnreadCount(chatThreadId);
-          io.to('admin-room').emit('updateUnreadCount', {
-            userId: chatThreadId,
-            unreadCount,
-          });
-        } else {
-          await ChatRepository.markMessagesAsRead(chatThreadId, adminSockets[0].data.user.id);
-          io.to('admin-room').emit('updateUnreadCount', {
-            userId: chatThreadId,
-            unreadCount: 0,
-          });
-        }
+        const unreadCount = await ChatRepository.getUnreadCount(chatThreadId);
+        console.log(`User message sent, updating unread count for ${chatThreadId} to ${unreadCount}`);
+        io.to('admin-room').emit('updateUnreadCount', {
+          userId: chatThreadId,
+          unreadCount,
+        });
+        syncUnreadCounts(socket); // Ensure all admins get updated counts
       }
       socket.emit('messageDelivered', messagePayload);
-
       ack?.({ status: 'success', message: messagePayload });
     } catch (error: any) {
       console.error('Message sending error:', error);
