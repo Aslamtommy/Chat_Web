@@ -228,16 +228,16 @@ const Home = () => {
   };
 
   const handleDelete = (messageId: string) => {
-    if (window.confirm('Are you sure you want to delete this message?')) {
-      chatService.deleteMessage(messageId).then(() => {
+    // Removed window.confirm
+    chatService.deleteMessage(messageId)
+      .then(() => {
         socketRef.current.emit('deleteMessage', { messageId });
         setMessages((prev) =>
           prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
         );
-      }).catch((error) => console.error('Failed to delete message:', error));
-    }
+      })
+      .catch((error) => console.error('Failed to delete message:', error));
   };
-
   const handleScreenshotUpload = () => {
     fileInputRef.current?.click();
   };

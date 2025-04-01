@@ -240,7 +240,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const handleDelete = (messageId: string) => {
-    if (window.confirm('Are you sure you want to delete this message?')) {
+ 
       adminService
         .deleteMessage(messageId)
         .then(() => {
@@ -253,7 +253,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           console.error('Failed to delete message:', error);
           // Optionally, show a toast notification to the user
         });
-    }
+   
   };
 
   return (
