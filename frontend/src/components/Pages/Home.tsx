@@ -9,6 +9,7 @@ import ProfileModal from '../Modal/ProfileModal';
 import { motion } from 'framer-motion';
 import { DollarSign } from 'lucide-react';
 
+// Updated Message interface to include isEdited and isDeleted
 interface Message {
   _id: string;
   content: string;
@@ -18,6 +19,8 @@ interface Message {
   duration?: number;
   timestamp?: string;
   senderId?: string;
+  isEdited?: boolean;
+  isDeleted?: boolean;
 }
 
 const Home = () => {
@@ -27,6 +30,8 @@ const Home = () => {
   const [screenshotRequested, setScreenshotRequested] = useState(() => {
     return localStorage.getItem('screenshotRequested') === 'true';
   });
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editedContent, setEditedContent] = useState<string>('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<any>(null);
   const navigate = useNavigate();
@@ -80,6 +85,18 @@ const Home = () => {
       setScreenshotRequested(false);
       localStorage.removeItem('screenshotRequested');
     });
+    socketRef.current.on('messageEdited', (updatedMessage: { _id: string; content: string; isEdited: boolean }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === updatedMessage._id ? { ...msg, content: updatedMessage.content, isEdited: true } : msg
+        )
+      );
+    });
+    socketRef.current.on('messageDeleted', ({ messageId }: { messageId: string }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
+      );
+    });
 
     const fetchChatHistory = async () => {
       try {
@@ -104,14 +121,16 @@ const Home = () => {
               status: 'delivered' as const,
               senderId: msg.sender_id.toString(),
               timestamp: msg.timestamp || new Date().toISOString(),
+              isEdited: msg.isEdited || false,
+              isDeleted: msg.isDeleted || false,
             };
           })
           .filter((msg: any): msg is Message => msg !== null)
-          // Sort messages in ascending order (oldest first) so newest messages are at the bottom
-          .sort((a:any, b:any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
+          .sort((a: any, b: any) =>
+            new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime()
+          );
 
         setMessages(formattedMessages);
-        // Ensure scroll to bottom happens after messages are rendered
         setTimeout(scrollToBottom, 0);
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
@@ -126,7 +145,6 @@ const Home = () => {
     };
   }, [navigate, handleNewMessage, scrollToBottom]);
 
-  // Ensure scroll to bottom whenever messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
@@ -191,6 +209,35 @@ const Home = () => {
     [scrollToBottom]
   );
 
+  const handleEditStart = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditedContent(content);
+  };
+
+  const handleEditSave = (messageId: string) => {
+    chatService.editMessage(messageId, editedContent).then(() => {
+      socketRef.current.emit('editMessage', { messageId, content: editedContent });
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
+        )
+      );
+      setEditingMessageId(null);
+      setEditedContent('');
+    }).catch((error) => console.error('Failed to edit message:', error));
+  };
+
+  const handleDelete = (messageId: string) => {
+    if (window.confirm('Are you sure you want to delete this message?')) {
+      chatService.deleteMessage(messageId).then(() => {
+        socketRef.current.emit('deleteMessage', { messageId });
+        setMessages((prev) =>
+          prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
+        );
+      }).catch((error) => console.error('Failed to delete message:', error));
+    }
+  };
+
   const handleScreenshotUpload = () => {
     fileInputRef.current?.click();
   };
@@ -217,7 +264,16 @@ const Home = () => {
               className="flex-1 overflow-y-auto bg-gradient-to-b from-black/40 to-black/20 px-2 sm:px-6"
               ref={chatContainerRef}
             >
-              <ChatList messages={messages} />
+              <ChatList
+                messages={messages}
+                editingMessageId={editingMessageId}
+                editedContent={editedContent}
+                setEditedContent={setEditedContent}
+                onEditStart={handleEditStart}
+                onEditSave={handleEditSave}
+                onEditCancel={() => setEditingMessageId(null)}
+                onDelete={handleDelete}
+              />
             </div>
             <div className="border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2">
               <ChatInput onSend={handleSend} />

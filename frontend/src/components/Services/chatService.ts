@@ -35,6 +35,27 @@ const chatService = {
     if (!response.data.success) throw new Error(response.data.error || 'Failed to send message');
     return response.data.data;
   },
+  editMessage: async (messageId: string, content: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No token found. Please log in.');
+    const response: any = await axios.put(
+      `${API_URL}/message/${messageId}`,
+      { content },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to edit message');
+    return response.data.data;
+  },
+  
+  deleteMessage: async (messageId: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No token found. Please log in.');
+    const response: any = await axios.delete(`${API_URL}/message/${messageId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to delete message');
+    return response.data.data;
+  },
 };
 
 export default chatService;

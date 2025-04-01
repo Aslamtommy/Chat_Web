@@ -112,6 +112,33 @@ class ChatRepository {
       msg => msg.sender_id.toString() === userId && msg.read_by_admin === false
     ).length;
   }
+  async updateMessage(messageId: string, content: string): Promise<IMessage> {
+    const chat = await ChatThread.findOneAndUpdate(
+      { 'messages._id': messageId },
+      {
+        $set: {
+          'messages.$.content': content,
+          'messages.$.isEdited': true,
+        },
+      },
+      { new: true }
+    ).lean<IChatThread>();
+    const updatedMessage = chat?.messages.find((msg) => msg._id.toString() === messageId);
+    if (!updatedMessage) throw new Error('Message not found');
+    return updatedMessage;
+  }
+  
+  async deleteMessage(messageId: string): Promise<void> {
+    const result = await ChatThread.updateOne(
+      { 'messages._id': messageId },
+      {
+        $set: {
+          'messages.$.isDeleted': true,
+        },
+      }
+    );
+    if (result.modifiedCount === 0) throw new Error('Message not found or already deleted');
+  }
 }
 
 export default new ChatRepository();

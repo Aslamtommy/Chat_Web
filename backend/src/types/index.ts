@@ -14,12 +14,14 @@ export interface IUser extends Document {
 }
 
 export interface IMessage {
-  _id?: string;
+  _id?: any
   sender_id: string | any;
   message_type: 'text' | 'image' | 'voice';
   content: string;
   timestamp?: Date;
   read_by_admin?: boolean; // Changed to required with default false in schema
+  isEdited?:boolean,
+  isDeleted?:boolean
 }
 
 export interface IChatThread extends Document {

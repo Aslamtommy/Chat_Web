@@ -7,6 +7,8 @@ const messageSchema = new Schema<IMessage>({
   content: { type: String, required: true },
   timestamp: { type: Date, default: Date.now },
   read_by_admin: { type: Boolean, default: false }, // Default is false
+  isEdited: { type: Boolean, default: false }, // New field for edit tracking
+  isDeleted: { type: Boolean, default: false }, // New field for soft deletion
 });
 
 // Add index for faster message queries

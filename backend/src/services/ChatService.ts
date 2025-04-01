@@ -33,6 +33,13 @@ class ChatService {
   async getAllChats(): Promise<IChatThread[]> {
     return ChatRepository.getAllThreads();
   }
+  async editMessage(messageId: string, content: string): Promise<IMessage> {
+    return ChatRepository.updateMessage(messageId, content);
+  }
+  
+  async deleteMessage(messageId: string): Promise<void> {
+    return ChatRepository.deleteMessage(messageId);
+  }
 }
 
 export default new ChatService();

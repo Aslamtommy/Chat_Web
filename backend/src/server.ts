@@ -11,6 +11,8 @@ import adminRoutes from './routes/adminRoutes';
 import ChatService from './services/ChatService';
 import dotenv from 'dotenv';
 import ChatRepository from './repositories/ChatRepository';
+import ChatThread from './models/ChatThread';
+import { IChatThread, IMessage } from './types'; // Import your types
 
 declare module 'express' {
   export interface Request {
@@ -19,7 +21,7 @@ declare module 'express' {
 }
 
 dotenv.config();
-const FRONTEND_URL = process.env.FRONTEND_URL
+const FRONTEND_URL = process.env.FRONTEND_URL;
 
 const app: Express = express();
 const server = http.createServer(app);
@@ -32,7 +34,7 @@ const io = new Server(server, {
 });
 
 app.use(cors({
-  origin:FRONTEND_URL,
+  origin: FRONTEND_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -139,6 +141,71 @@ io.on('connection', (socket: Socket) => {
       });
     } catch (error) {
       console.error('Error marking messages as read:', error);
+    }
+  });
+
+  socket.on('editMessage', async ({ messageId, content }, ack) => {
+    try {
+      const senderId = socket.data.user.id;
+      const chat = await ChatThread.findOne({ 'messages._id': messageId }) as IChatThread | null;
+      if (!chat) {
+        throw new Error('Chat thread not found');
+      }
+
+      // Find the message in the messages array (since id() may not work with TypeScript)
+      const message = chat.messages.find((msg: IMessage) => msg._id?.toString() === messageId);
+      if (!message) {
+        throw new Error('Message not found');
+      }
+
+      if (message.sender_id.toString() !== senderId) {
+        throw new Error('You can only edit your own messages');
+      }
+
+      const updatedMessage = await ChatService.editMessage(messageId, content);
+      const messagePayload = {
+        _id: updatedMessage._id.toString(),
+        content: updatedMessage.content,
+        isEdited: true,
+      };
+
+      const targetUserId = chat.user_id.toString();
+      io.to(targetUserId).emit('messageEdited', messagePayload);
+      io.to('admin-room').emit('messageEdited', messagePayload);
+      ack?.({ status: 'success', message: messagePayload });
+    } catch (error) {
+      socket.emit('messageError', { error: (error as Error).message });
+      ack?.({ status: 'error', error: (error as Error).message });
+    }
+  });
+
+  socket.on('deleteMessage', async ({ messageId }, ack) => {
+    try {
+      const senderId = socket.data.user.id;
+      const chat = await ChatThread.findOne({ 'messages._id': messageId }) as IChatThread | null;
+      if (!chat) {
+        throw new Error('Chat thread not found');
+      }
+
+      // Find the message in the messages array
+      const message = chat.messages.find((msg: IMessage) => msg._id?.toString() === messageId);
+      if (!message) {
+        throw new Error('Message not found');
+      }
+
+      if (message.sender_id.toString() !== senderId) {
+        throw new Error('You can only delete your own messages');
+      }
+
+      await ChatService.deleteMessage(messageId);
+      
+      const targetUserId = chat.user_id.toString();
+      io.to(targetUserId).emit('messageDeleted', { messageId });
+      io.to('admin-room').emit('messageDeleted', { messageId });
+      ack?.({ status: 'success' });
+    } catch (error) {
+      socket.emit('messageError', { error: (error as Error).message });
+      ack?.({ status: 'error', error: (error as Error).message });
     }
   });
 

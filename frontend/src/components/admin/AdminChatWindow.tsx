@@ -6,17 +6,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DollarSign, X, Check, User, ArrowLeft } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 
+// Define the Message interface explicitly
 interface Message {
   _id: string;
   content: string;
   isSelf: boolean;
   messageType?: 'text' | 'image' | 'voice' | 'screenshot';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
-  senderId: string;
+  senderId?: string;
   chatId?: string;
-  duration?: number;
   timestamp?: string;
-  read: boolean;
+  isEdited?: boolean;
+  isDeleted?: boolean;
 }
 
 interface AdminChatWindowProps {
@@ -33,6 +34,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showUserDetails, setShowUserDetails] = useState(false);
   const [screenshotStatus, setScreenshotStatus] = useState<'none' | 'requested' | 'fulfilled'>('none');
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editedContent, setEditedContent] = useState<string>('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const adminId = useRef<string | null>(null);
 
@@ -44,7 +47,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
 
   const markMessagesAsRead = useCallback(() => {
     if (userId && socket) {
-      adminService.markMessagesAsRead(userId)
+      adminService
+        .markMessagesAsRead(userId)
         .then(() => {
           socket.emit('markMessagesAsRead', { chatId: userId });
           socket.emit('syncUnreadCounts');
@@ -66,27 +70,41 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     const fetchChatHistory = async () => {
       try {
         const chat = await adminService.getUserChatHistory(userId);
-        const formattedMessages: Message[] = chat.messages.map((msg: any) => ({
-          _id: msg._id.toString(),
-          content: msg.content,
-          isSelf: msg.sender_id.toString() === adminId.current,
-          messageType: msg.message_type || 'text',
-          status: 'delivered' as const,
-          senderId: msg.sender_id.toString(),
-          chatId: chat._id.toString(),
-          timestamp: msg.timestamp,
-          read: true,
-        }));
+        const formattedMessages: Message[] = chat.messages
+          .map((msg: any) => {
+            if (!msg || !msg._id || !msg.sender_id) {
+              console.warn('Invalid message format:', msg);
+              return null;
+            }
+            return {
+              _id: msg._id.toString(),
+              content: msg.content || '',
+              isSelf: msg.sender_id.toString() === adminId.current,
+              messageType: msg.message_type || 'text',
+              status: 'delivered' as const,
+              senderId: msg.sender_id.toString(),
+              chatId: chat._id.toString(),
+              timestamp: msg.timestamp || new Date().toISOString(),
+              isEdited: msg.isEdited || false,
+              isDeleted: msg.isDeleted || false,
+            };
+          })
+          .filter((msg: any): msg is Message => msg !== null)
+          .sort((a:any, b:any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
+
         setMessages(formattedMessages);
-        // Check if there's a recent screenshot to set initial status
         const hasRecentScreenshot = formattedMessages.some(
-          msg => msg.messageType === 'screenshot' && !msg.isSelf && new Date(msg.timestamp || '').getTime() > Date.now() - 24 * 60 * 60 * 1000
+          (msg) =>
+            msg.messageType === 'screenshot' &&
+            !msg.isSelf &&
+            new Date(msg.timestamp || '').getTime() > Date.now() - 24 * 60 * 60 * 1000
         );
         setScreenshotStatus(hasRecentScreenshot ? 'fulfilled' : 'none');
         setTimeout(() => scrollToBottom(), 0);
         markMessagesAsRead();
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
+        setMessages([]);
       }
     };
 
@@ -97,12 +115,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         const isAdminMessage = message.senderId === adminId.current;
         setMessages((prev) => [
           ...prev,
-          { 
-            ...message, 
-            status: 'delivered' as const, 
-            isSelf: isAdminMessage,
-            read: isAdminMessage // Admin messages are always marked as read
-          },
+          { ...message, status: 'delivered' as const, isSelf: isAdminMessage },
         ]);
         if (message.messageType === 'screenshot' && !isAdminMessage) {
           setScreenshotStatus('fulfilled');
@@ -122,11 +135,30 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       }
     };
 
+    const handleMessageEdited = (updatedMessage: { _id: string; content: string; isEdited: boolean }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === updatedMessage._id ? { ...msg, content: updatedMessage.content, isEdited: true } : msg
+        )
+      );
+    };
+
+    const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
+      );
+    };
+
     socket.on('newMessage', handleNewMessage);
     socket.on('screenshotFulfilled', handleScreenshotFulfilled);
+    socket.on('messageEdited', handleMessageEdited);
+    socket.on('messageDeleted', handleMessageDeleted);
+
     return () => {
       socket.off('newMessage', handleNewMessage);
       socket.off('screenshotFulfilled', handleScreenshotFulfilled);
+      socket.off('messageEdited', handleMessageEdited);
+      socket.off('messageDeleted', handleMessageDeleted);
     };
   }, [userId, socket, scrollToBottom, markMessagesAsRead]);
 
@@ -142,7 +174,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   const handleSend = useCallback(
     async (messageType: 'text' | 'image' | 'voice', content: string | File) => {
       if (!userId || !adminId.current) return;
-
       const tempId = Date.now().toString();
       const tempMessage: Message = {
         _id: tempId,
@@ -153,9 +184,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         senderId: adminId.current,
         chatId: userId,
         timestamp: new Date().toISOString(),
-        read: true,
       };
-
       setMessages((prev) => [...prev, tempMessage]);
       scrollToBottom();
 
@@ -171,7 +200,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                   content: savedMessage.content,
                   status: 'delivered' as const,
                   timestamp: savedMessage.timestamp,
-                  read: true,
                 }
               : msg
           )
@@ -186,6 +214,47 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     },
     [userId, scrollToBottom]
   );
+
+  const handleEditStart = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditedContent(content);
+  };
+
+  const handleEditSave = (messageId: string) => {
+    adminService
+      .editMessage(messageId, editedContent)
+      .then(() => {
+        socket.emit('editMessage', { messageId, content: editedContent });
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
+          )
+        );
+        setEditingMessageId(null);
+        setEditedContent('');
+      })
+      .catch((error) => {
+        console.error('Failed to edit message:', error);
+        // Optionally, show a toast notification to the user
+      });
+  };
+
+  const handleDelete = (messageId: string) => {
+    if (window.confirm('Are you sure you want to delete this message?')) {
+      adminService
+        .deleteMessage(messageId)
+        .then(() => {
+          socket.emit('deleteMessage', { messageId });
+          setMessages((prev) =>
+            prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
+          );
+        })
+        .catch((error) => {
+          console.error('Failed to delete message:', error);
+          // Optionally, show a toast notification to the user
+        });
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-black/40 backdrop-blur-sm relative">
@@ -224,7 +293,9 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowRequestModal(true)}
-                  className={`bg-gradient-to-r from-amber-600 to-amber-700 text-white px-2 sm:px-4 py-2 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/30 ${screenshotStatus === 'fulfilled' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`bg-gradient-to-r from-amber-600 to-amber-700 text-white px-2 sm:px-4 py-2 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/30 ${
+                    screenshotStatus === 'fulfilled' ? 'opacity-60 cursor-not-allowed' : ''
+                  }`}
                   disabled={screenshotStatus === 'fulfilled' || !userId || !socket}
                 >
                   <DollarSign className="w-4 h-4" />
@@ -235,9 +306,17 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatContainerRef}>
-            <ChatList messages={messages} />
-          </div>
+          <ChatList
+            messages={messages}
+            editingMessageId={editingMessageId}
+            editedContent={editedContent}
+            setEditedContent={setEditedContent}
+            onEditStart={handleEditStart}
+            onEditSave={handleEditSave}
+            onEditCancel={() => setEditingMessageId(null)}
+            onDelete={handleDelete}
+            ref={chatContainerRef}
+          />
           <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-sm relative">
             <ChatInput onSend={handleSend} />
           </div>
