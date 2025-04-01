@@ -193,6 +193,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     setShowToast(true);
     setShowRequestModal(false);
     setTimeout(() => setShowToast(false), 3000);
+    // Reset payment details after sending
     setPaymentDetails({ accountNumber: '', ifscCode: '', amount: '', name: '', upiId: '' });
   };
 
@@ -289,103 +290,96 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-black/40 backdrop-blur-sm">
+    <div className="flex-1 flex flex-col h-full bg-black/40 backdrop-blur-sm relative">
       {userId ? (
         <>
-          {/* Header */}
-          <div className="p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10 flex-shrink-0">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center space-x-2 min-w-0">
+          <div className="p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
                 {isMobile && onBack && (
                   <button
                     onClick={onBack}
-                    className="p-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
+                    className="md:hidden p-1.5 sm:p-2 mr-1 sm:mr-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
                   >
-                    <ArrowLeft className="w-5 h-5" />
+                    <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 )}
-                <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30 flex-shrink-0">
+                <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
                   <span className="text-sm font-medium text-amber-500">
                     {username?.charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <h3 className="text-base font-medium text-white truncate">{username || 'User'}</h3>
+                <h3 className="text-base font-medium text-white">{username || 'User'}</h3>
               </div>
-              <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="flex items-center space-x-2">
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowUserDetails(true)}
-                  className="p-2 rounded-xl bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 transition-all duration-300"
+                  className="p-2 rounded-xl bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 transition-all duration-300 flex items-center space-x-2"
                   title="View User Details"
                 >
                   <User className="w-4 h-4" />
+                  <span className="text-sm font-medium hidden sm:inline">User Details</span>
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowRequestModal(true)}
-                  className={`bg-gradient-to-r from-amber-600 to-amber-700 text-white px-3 py-1.5 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 text-sm font-semibold border border-amber-500/30 ${
+                  className={`bg-gradient-to-r from-amber-600 to-amber-700 text-white px-2 sm:px-4 py-2 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/30 ${
                     screenshotStatus === 'fulfilled' ? 'opacity-60 cursor-not-allowed' : ''
                   }`}
                   disabled={screenshotStatus === 'fulfilled' || !userId || !socket}
                 >
-                  <DollarSign className="w-4 h-4 inline mr-1" />
+                  <DollarSign className="w-4 h-4" />
                   <span className="hidden sm:inline">
-                    {screenshotStatus === 'fulfilled' ? 'Received' : 'Request'}
+                    {screenshotStatus === 'fulfilled' ? 'Screenshot Received' : 'Request Payment Screenshot'}
                   </span>
-                  <span className="sm:hidden">Request</span>
                 </motion.button>
               </div>
             </div>
           </div>
-
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
-            <ChatList
-              messages={messages}
-              editingMessageId={editingMessageId}
-              editedContent={editedContent}
-              setEditedContent={setEditedContent}
-              onEditStart={handleEditStart}
-              onEditSave={handleEditSave}
-              onEditCancel={() => setEditingMessageId(null)}
-              onDelete={handleDelete}
-            />
-          </div>
-
-          {/* Chat Input */}
-          <div className="p-2 border-t border-white/10 bg-black/20 backdrop-blur-sm flex-shrink-0">
+          <ChatList
+            messages={messages}
+            editingMessageId={editingMessageId}
+            editedContent={editedContent}
+            setEditedContent={setEditedContent}
+            onEditStart={handleEditStart}
+            onEditSave={handleEditSave}
+            onEditCancel={() => setEditingMessageId(null)}
+            onDelete={handleDelete}
+            ref={chatContainerRef}
+          />
+          <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-sm relative">
             <ChatInput onSend={handleSend} />
           </div>
 
-          {/* Payment Request Modal */}
           <AnimatePresence>
             {showRequestModal && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
               >
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-sm max-h-[80vh] overflow-y-auto"
+                  className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 w-11/12 max-w-md mx-4"
                 >
-                  <h4 className="text-lg font-semibold text-white mb-3">Request Payment</h4>
-                  <p className="text-white/80 text-sm mb-4">
-                    Enter details for {username || 'this user'}.
+                  <h4 className="text-lg font-semibold text-white mb-4">Request Payment Screenshot</h4>
+                  <p className="text-white/80 text-sm mb-6">
+                    Enter payment details to request a screenshot from {username || 'this user'}.
                   </p>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <input
                       type="text"
                       name="accountNumber"
                       value={paymentDetails.accountNumber}
                       onChange={handleInputChange}
                       placeholder="Account Number"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500 text-sm"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
                     />
                     <input
                       type="text"
@@ -393,15 +387,15 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                       value={paymentDetails.ifscCode}
                       onChange={handleInputChange}
                       placeholder="IFSC Code"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500 text-sm"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
                     />
                     <input
                       type="text"
                       name="amount"
                       value={paymentDetails.amount}
                       onChange={handleInputChange}
-                      placeholder="Amount"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500 text-sm"
+                      placeholder="Amount (e.g., 500)"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
                     />
                     <input
                       type="text"
@@ -409,38 +403,38 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                       value={paymentDetails.name}
                       onChange={handleInputChange}
                       placeholder="Account Holder Name"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500 text-sm"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
                     />
                     <input
                       type="text"
                       name="upiId"
                       value={paymentDetails.upiId}
                       onChange={handleInputChange}
-                      placeholder="UPI ID"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500 text-sm"
+                      placeholder="UPI ID (e.g., name@upi)"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
                     />
                   </div>
-                  <div className="flex justify-end space-x-2 mt-4">
+                  <div className="flex justify-end space-x-3 mt-6">
                     <motion.button
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => setShowRequestModal(false)}
-                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-3 py-1.5 rounded-lg shadow-md hover:from-gray-700 hover:to-gray-800 text-sm"
+                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-2 rounded-lg shadow-md hover:from-gray-700 hover:to-gray-800 transition-all duration-300 flex items-center space-x-2 text-sm font-medium"
                     >
-                      <X className="w-4 h-4 inline mr-1" />
-                      Cancel
+                      <X className="w-4 h-4" />
+                      <span>Cancel</span>
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={handleRequestScreenshot}
                       disabled={!isPaymentDetailsValid()}
-                      className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg shadow-md text-sm ${
+                      className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-all duration-300 flex items-center space-x-2 text-sm font-medium ${
                         !isPaymentDetailsValid() ? 'opacity-60 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-800'
                       }`}
                     >
-                      <Check className="w-4 h-4 inline mr-1" />
-                      Send
+                      <Check className="w-4 h-4" />
+                      <span>Send</span>
                     </motion.button>
                   </div>
                 </motion.div>
@@ -448,40 +442,38 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             )}
           </AnimatePresence>
 
-          {/* Toast Notification */}
           <AnimatePresence>
             {showToast && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-4 right-4 bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-2 rounded-xl shadow-md text-sm font-medium flex items-center space-x-2"
+                className="fixed bottom-4 right-4 md:bottom-6 md:right-6 lg:bottom-8 lg:right-8 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl shadow-md text-sm font-medium flex items-center space-x-2"
               >
                 <DollarSign className="w-4 h-4" />
-                <span>{screenshotStatus === 'fulfilled' ? 'Screenshot received' : 'Request sent'}</span>
+                <span>{screenshotStatus === 'fulfilled' ? 'Screenshot received' : 'Screenshot request sent'}</span>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* User Details Modal */}
           {showUserDetails && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto"
+                className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 w-11/12 max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
               >
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-semibold text-white">User Details</h4>
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="text-xl font-semibold text-white">User Details</h4>
                   <button
                     onClick={() => setShowUserDetails(false)}
-                    className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"
+                    className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-colors"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -493,7 +485,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-white/70 text-base">{isMobile ? 'Select a user' : 'No user selected'}</p>
+          <p className="text-white/70 text-lg">{isMobile ? 'Select a user to start chatting' : 'No user selected'}</p>
         </div>
       )}
     </div>
