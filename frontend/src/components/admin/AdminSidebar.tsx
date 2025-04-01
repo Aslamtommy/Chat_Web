@@ -179,7 +179,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   return (
     <div className={`${isMobile ? 'w-full' : 'w-80'} bg-gradient-to-br from-black/80 via-black/60 to-black/40 backdrop-blur-xl border-r border-white/10 h-full overflow-y-auto shadow-2xl`}>
       <div className="p-6 border-b border-white/10">
-        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-amber-300 mb-6">Admin Dashboard</h2>
+ 
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5 group-hover:text-amber-500 transition-colors duration-200" />
           <input

@@ -106,7 +106,8 @@ const Home = () => {
               timestamp: msg.timestamp || new Date().toISOString(),
             };
           })
-          .filter((msg: any): msg is Message => msg !== null);
+          .filter((msg: any): msg is Message => msg !== null)
+          .sort((a:any, b:any) => new Date(b.timestamp || '').getTime() - new Date(a.timestamp || '').getTime());
 
         setMessages(formattedMessages);
         scrollToBottom();
@@ -201,16 +202,16 @@ const Home = () => {
   return (
     <div className="flex flex-col h-screen bg-black font-serif">
       <ChatHeader onProfileClick={() => setIsProfileModalOpen(true)} />
-      <div className="flex-1 flex flex-col mx-2 sm:mx-4 mb-4 mt-2 overflow-hidden rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10">
+      <div className="flex-1 flex flex-col mx-1 sm:mx-4 mb-2 sm:mb-4 mt-1 sm:mt-2 overflow-hidden rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10">
         {activeTab === 'chats' && (
           <>
             <div
-              className="flex-1 overflow-y-auto bg-gradient-to-b from-black/40 to-black/20"
+              className="flex-1 overflow-y-auto bg-gradient-to-b from-black/40 to-black/20 px-2 sm:px-6"
               ref={chatContainerRef}
             >
               <ChatList messages={messages} />
             </div>
-            <div className="border-t border-white/10 bg-black/30 backdrop-blur-md">
+            <div className="border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2">
               <ChatInput onSend={handleSend} />
               {screenshotRequested && (
                 <motion.div
@@ -222,7 +223,7 @@ const Home = () => {
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={handleScreenshotUpload}
-                    className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/20"
+                    className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/20"
                   >
                     <DollarSign className="w-4 h-4" />
                     <span>Upload Payment Screenshot</span>
