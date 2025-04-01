@@ -20,7 +20,7 @@ interface AdminUserDetailsProps {
 
 const AdminUserDetails = ({ userId }: AdminUserDetailsProps) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+   
 
   useEffect(() => {
     const fetchUserDetails = async () => {
