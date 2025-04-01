@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// services/ChatService.ts
 const ChatRepository_1 = __importDefault(require("../repositories/ChatRepository"));
 const mongoose_1 = __importDefault(require("mongoose"));
 class ChatService {
@@ -15,12 +16,18 @@ class ChatService {
     }
     async saveMessage(chatThreadId, senderId, messageType, content) {
         const message = {
-            sender_id: new mongoose_1.default.Types.ObjectId(senderId), // Ensure ObjectId
+            sender_id: new mongoose_1.default.Types.ObjectId(senderId),
             message_type: messageType,
             content,
             timestamp: new Date(),
-            read_by_admin: false, // Explicitly set to false
         };
+        // Set read_by_admin only if the sender is the user (chatThreadId represents the user ID)
+        if (senderId.toString() === chatThreadId) {
+            message.read_by_admin = false; // User-sent message, unread by admin
+        }
+        else {
+            message.read_by_admin = true; // Admin-sent message, inherently "read" by admin
+        }
         return ChatRepository_1.default.addMessage(chatThreadId, message);
     }
     async getAllChats() {

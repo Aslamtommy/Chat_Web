@@ -14,4 +14,8 @@ const userSchema = new mongoose_1.Schema({
     place: { type: String, required: true },
     district: { type: String, required: true },
 });
+// Add indexes for frequently queried fields
+userSchema.index({ email: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ username: 1 });
 exports.default = (0, mongoose_1.model)('User', userSchema);

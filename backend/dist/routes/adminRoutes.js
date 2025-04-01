@@ -13,6 +13,7 @@ const upload_1 = __importDefault(require("../middleware/upload"));
 const router = express_1.default.Router();
 router.post('/auth/login', AdminAuthController_1.default.adminLogin);
 router.get('/users', auth_1.default, role_1.adminRoleMiddleware, AdminAuthController_1.default.getUsers);
+router.get('/users/with-last-message', auth_1.default, role_1.adminRoleMiddleware, AdminAuthController_1.default.getUsersWithLastMessage);
 router.get('/users/:id', auth_1.default, role_1.adminRoleMiddleware, AdminAuthController_1.default.getUserById);
 router.get('/chats', auth_1.default, role_1.adminRoleMiddleware, AdminChatController_1.default.getAllChats);
 router.get('/chats/user/:userId', auth_1.default, role_1.adminRoleMiddleware, validateUserId_1.validateUserId, AdminChatController_1.default.getUserChatHistory);

@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const AuthService_1 = __importDefault(require("../services/AuthService"));
 const UserRepository_1 = __importDefault(require("../repositories/UserRepository"));
+const ChatRepository_1 = __importDefault(require("../repositories/ChatRepository"));
 class AdminAuthController {
     async adminLogin(req, res) {
         try {
@@ -26,6 +27,32 @@ class AdminAuthController {
             res.json({ success: true, data: users });
         }
         catch (error) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+    async getUsersWithLastMessage(req, res) {
+        try {
+            const users = await UserRepository_1.default.findAll();
+            const usersWithLastMessage = await Promise.all(users.map(async (user) => {
+                const chat = await ChatRepository_1.default.findByUserId(user._id.toString());
+                const lastMessage = chat?.messages[chat.messages.length - 1];
+                return {
+                    ...user,
+                    lastMessageTimestamp: lastMessage?.timestamp || null,
+                };
+            }));
+            // Sort users by last message timestamp
+            const sortedUsers = usersWithLastMessage.sort((a, b) => {
+                if (!a.lastMessageTimestamp)
+                    return 1;
+                if (!b.lastMessageTimestamp)
+                    return -1;
+                return new Date(b.lastMessageTimestamp).getTime() - new Date(a.lastMessageTimestamp).getTime();
+            });
+            res.json({ success: true, data: sortedUsers });
+        }
+        catch (error) {
+            console.error('Error in getUsersWithLastMessage:', error);
             res.status(500).json({ success: false, error: error.message });
         }
     }
