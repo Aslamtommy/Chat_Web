@@ -104,6 +104,7 @@ const AdminDashboard = () => {
       <div className="flex flex-1 overflow-hidden">
         {isSocketConnected && socketRef.current ? (
           <>
+            {/* Show sidebar if no user is selected or if not in mobile view */}
             {(!isMobileView || selectedUserId === null) && (
               <AdminSidebar
                 onSelectUser={handleSelectUser}
@@ -112,14 +113,17 @@ const AdminDashboard = () => {
                 isMobile={isMobileView}
               />
             )}
-            <div className="flex-1 flex flex-col">
-              <AdminChatWindow
-                userId={selectedUserId}
-                username={selectedUserName}
-                socket={socketRef.current}
-                isMobile={isMobileView}
-              />
-            </div>
+            {/* Show chat window only if a user is selected or if not in mobile view */}
+            {(!isMobileView || selectedUserId !== null) && (
+              <div className="flex-1 flex flex-col">
+                <AdminChatWindow
+                  userId={selectedUserId}
+                  username={selectedUserName}
+                  socket={socketRef.current}
+                  isMobile={isMobileView}
+                />
+              </div>
+            )}
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
