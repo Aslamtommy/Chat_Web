@@ -3,7 +3,7 @@ import adminService from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DollarSign, X, Check, User } from 'lucide-react';
+import { DollarSign, X, Check, User, ArrowLeft } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 
 interface Message {
@@ -24,9 +24,10 @@ interface AdminChatWindowProps {
   username?: string | null;
   socket: any;
   isMobile: boolean;
+  onBack?: () => void;
 }
 
-const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindowProps) => {
+const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [showToast, setShowToast] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -193,6 +194,14 @@ const AdminChatWindow = ({ userId, username, socket, isMobile }: AdminChatWindow
           <div className="p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10 relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
+                {isMobile && onBack && (
+                  <button
+                    onClick={onBack}
+                    className="md:hidden p-1.5 sm:p-2 mr-1 sm:mr-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
+                  >
+                    <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                )}
                 <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
                   <span className="text-sm font-medium text-amber-500">
                     {username?.charAt(0).toUpperCase()}

@@ -6,13 +6,15 @@ interface AdminHeaderProps {
   adminName?: string;
   showBackButton?: boolean;
   onBack?: () => void;
+  hideOnMobile?: boolean;
 }
 
 const AdminHeader = ({ 
   onLogout, 
   adminName = "Admin",
   showBackButton = false,
-  onBack = () => {}
+  onBack = () => {},
+  hideOnMobile = false
 }: AdminHeaderProps) => {
   const navigate = useNavigate();
 
@@ -23,7 +25,7 @@ const AdminHeader = ({
   };
 
   return (
-    <header className="flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 bg-black/40 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
+    <header className={`flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 bg-black/40 backdrop-blur-md border-b border-white/10 sticky top-0 z-50 ${hideOnMobile ? 'hidden md:flex' : ''}`}>
       {/* Left Section - Back Button & Logo */}
       <div className="flex items-center space-x-2 sm:space-x-3">
         {/* Back Button (Mobile Only) */}

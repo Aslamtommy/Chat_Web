@@ -100,6 +100,7 @@ const AdminDashboard = () => {
         onLogout={handleLogout} 
         showBackButton={isMobileView && selectedUserId !== null}
         onBack={handleBackToUsers}
+        hideOnMobile={isMobileView && selectedUserId !== null}
       />
       <div className="flex flex-1 overflow-hidden">
         {isSocketConnected && socketRef.current ? (
@@ -121,6 +122,7 @@ const AdminDashboard = () => {
                   username={selectedUserName}
                   socket={socketRef.current}
                   isMobile={isMobileView}
+                  onBack={handleBackToUsers}
                 />
               </div>
             )}
