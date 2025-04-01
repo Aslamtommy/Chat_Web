@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DollarSign, X, Check, User, ArrowLeft } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 
-// Define the Message interface explicitly
 interface Message {
   _id: string;
   content: string;
@@ -18,6 +17,14 @@ interface Message {
   timestamp?: string;
   isEdited?: boolean;
   isDeleted?: boolean;
+}
+
+interface PaymentDetails {
+  accountNumber: string;
+  ifscCode: string;
+  amount: string;
+  name: string;
+  upiId: string;
 }
 
 interface AdminChatWindowProps {
@@ -36,6 +43,13 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   const [screenshotStatus, setScreenshotStatus] = useState<'none' | 'requested' | 'fulfilled'>('none');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState<string>('');
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails>({
+    accountNumber: '',
+    ifscCode: '',
+    amount: '',
+    name: '',
+    upiId: '',
+  });
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const adminId = useRef<string | null>(null);
 
@@ -90,7 +104,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             };
           })
           .filter((msg: any): msg is Message => msg !== null)
-          .sort((a:any, b:any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
+          .sort((a: any, b: any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
         setMessages(formattedMessages);
         const hasRecentScreenshot = formattedMessages.some(
@@ -164,11 +178,23 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
 
   const handleRequestScreenshot = () => {
     if (!userId || !socket) return;
-    socket.emit('requestScreenshot', { userId });
+    const paymentRequest = {
+      userId,
+      paymentDetails: {
+        accountNumber: paymentDetails.accountNumber,
+        ifscCode: paymentDetails.ifscCode.toUpperCase(),
+        amount: paymentDetails.amount,
+        name: paymentDetails.name,
+        upiId: paymentDetails.upiId,
+      },
+    };
+    socket.emit('requestScreenshot', paymentRequest);
     setScreenshotStatus('requested');
     setShowToast(true);
     setShowRequestModal(false);
     setTimeout(() => setShowToast(false), 3000);
+    // Reset payment details after sending
+    setPaymentDetails({ accountNumber: '', ifscCode: '', amount: '', name: '', upiId: '' });
   };
 
   const handleSend = useCallback(
@@ -233,27 +259,34 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         setEditingMessageId(null);
         setEditedContent('');
       })
-      .catch((error) => {
-        console.error('Failed to edit message:', error);
-        // Optionally, show a toast notification to the user
-      });
+      .catch((error) => console.error('Failed to edit message:', error));
   };
 
   const handleDelete = (messageId: string) => {
- 
-      adminService
-        .deleteMessage(messageId)
-        .then(() => {
-          socket.emit('deleteMessage', { messageId });
-          setMessages((prev) =>
-            prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
-          );
-        })
-        .catch((error) => {
-          console.error('Failed to delete message:', error);
-          // Optionally, show a toast notification to the user
-        });
-   
+    adminService
+      .deleteMessage(messageId)
+      .then(() => {
+        socket.emit('deleteMessage', { messageId });
+        setMessages((prev) =>
+          prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
+        );
+      })
+      .catch((error) => console.error('Failed to delete message:', error));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPaymentDetails((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const isPaymentDetailsValid = () => {
+    return (
+      paymentDetails.accountNumber.trim() &&
+      paymentDetails.ifscCode.trim() &&
+      paymentDetails.amount.trim() &&
+      paymentDetails.name.trim() &&
+      paymentDetails.upiId.trim()
+    );
   };
 
   return (
@@ -337,9 +370,51 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                 >
                   <h4 className="text-lg font-semibold text-white mb-4">Request Payment Screenshot</h4>
                   <p className="text-white/80 text-sm mb-6">
-                    Are you sure you want to request a payment screenshot from {username || 'this user'}?
+                    Enter payment details to request a screenshot from {username || 'this user'}.
                   </p>
-                  <div className="flex justify-end space-x-3">
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      name="accountNumber"
+                      value={paymentDetails.accountNumber}
+                      onChange={handleInputChange}
+                      placeholder="Account Number"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      type="text"
+                      name="ifscCode"
+                      value={paymentDetails.ifscCode}
+                      onChange={handleInputChange}
+                      placeholder="IFSC Code"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      type="text"
+                      name="amount"
+                      value={paymentDetails.amount}
+                      onChange={handleInputChange}
+                      placeholder="Amount (e.g., 500)"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      type="text"
+                      name="name"
+                      value={paymentDetails.name}
+                      onChange={handleInputChange}
+                      placeholder="Account Holder Name"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                    />
+                    <input
+                      type="text"
+                      name="upiId"
+                      value={paymentDetails.upiId}
+                      onChange={handleInputChange}
+                      placeholder="UPI ID (e.g., name@upi)"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-3 mt-6">
                     <motion.button
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
@@ -353,7 +428,10 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={handleRequestScreenshot}
-                      className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md hover:from-green-700 hover:to-green-800 transition-all duration-300 flex items-center space-x-2 text-sm font-medium"
+                      disabled={!isPaymentDetailsValid()}
+                      className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-all duration-300 flex items-center space-x-2 text-sm font-medium ${
+                        !isPaymentDetailsValid() ? 'opacity-60 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-800'
+                      }`}
                     >
                       <Check className="w-4 h-4" />
                       <span>Send</span>

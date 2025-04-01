@@ -7,9 +7,8 @@ import ChatInput from '../chat/ChatInput';
 import chatService from '../Services/chatService';
 import ProfileModal from '../Modal/ProfileModal';
 import { motion } from 'framer-motion';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, X, Upload } from 'lucide-react';
 
-// Updated Message interface to include isEdited and isDeleted
 interface Message {
   _id: string;
   content: string;
@@ -23,6 +22,14 @@ interface Message {
   isDeleted?: boolean;
 }
 
+interface PaymentDetails {
+  accountNumber: string;
+  ifscCode: string;
+  amount: string;
+  name: string;
+  upiId: string;
+}
+
 const Home = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeTab, setActiveTab] = useState<'chats' | 'files' | 'profile'>('chats');
@@ -30,18 +37,23 @@ const Home = () => {
   const [screenshotRequested, setScreenshotRequested] = useState(() => {
     return localStorage.getItem('screenshotRequested') === 'true';
   });
+  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(() => {
+    const stored = localStorage.getItem('paymentDetails');
+    return stored ? JSON.parse(stored) : null;
+  });
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState<string>('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<any>(null);
   const navigate = useNavigate();
   const pendingMessages = useRef<Set<string>>(new Set());
-  const userId = useRef<string | null>(null);
+  const userId = useRef<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     localStorage.setItem('screenshotRequested', screenshotRequested.toString());
-  }, [screenshotRequested]);
+    localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails));
+  }, [screenshotRequested, paymentDetails]);
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
@@ -77,14 +89,29 @@ const Home = () => {
     socketRef.current.on('connect', () => {
       const decoded = jwtDecode<{ id: string }>(token);
       userId.current = decoded.id;
+      console.log('Socket connected, userId:', userId.current);
     });
 
     socketRef.current.on('newMessage', handleNewMessage);
-    socketRef.current.on('screenshotRequested', () => setScreenshotRequested(true));
-    socketRef.current.on('screenshotFulfilled', () => {
-      setScreenshotRequested(false);
-      localStorage.removeItem('screenshotRequested');
+
+    socketRef.current.on('screenshotRequested', (data: { userId: string; paymentDetails: PaymentDetails }) => {
+      console.log('Received screenshotRequested:', data);
+      if (data.userId === userId.current) {
+        setScreenshotRequested(true);
+        setPaymentDetails(data.paymentDetails);
+      } else {
+        console.log('User ID mismatch:', data.userId, '!=', userId.current);
+      }
     });
+
+    socketRef.current.on('screenshotFulfilled', () => {
+      console.log('Screenshot fulfilled received');
+      setScreenshotRequested(false);
+      setPaymentDetails(null);
+      localStorage.removeItem('screenshotRequested');
+      localStorage.removeItem('paymentDetails');
+    });
+
     socketRef.current.on('messageEdited', (updatedMessage: { _id: string; content: string; isEdited: boolean }) => {
       setMessages((prev) =>
         prev.map((msg) =>
@@ -92,10 +119,15 @@ const Home = () => {
         )
       );
     });
+
     socketRef.current.on('messageDeleted', ({ messageId }: { messageId: string }) => {
       setMessages((prev) =>
         prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
       );
+    });
+
+    socketRef.current.on('connect_error', (error: any) => {
+      console.error('Socket connection error:', error);
     });
 
     const fetchChatHistory = async () => {
@@ -151,7 +183,7 @@ const Home = () => {
 
   const handleSend = useCallback(
     async (messageType: 'text' | 'image' | 'voice' | 'screenshot', content: string | File, duration?: number) => {
-      if (!socketRef.current) return;
+      if (!socketRef.current || !userId.current) return;
 
       const tempId = Date.now().toString();
       const tempMessage: Message = {
@@ -160,7 +192,7 @@ const Home = () => {
         isSelf: true,
         messageType,
         status: 'sending',
-        senderId: userId.current || '',
+        senderId: userId.current,
         duration,
         timestamp: new Date().toISOString(),
       };
@@ -189,8 +221,8 @@ const Home = () => {
                   content: savedMessage.content,
                   isSelf: true,
                   messageType: msg.messageType,
-                  status: 'delivered',
-                  senderId: userId.current || '',
+                  status: 'delivered' as const,
+                  senderId: userId.current,
                   duration: savedMessage.duration || duration,
                   timestamp: savedMessage.timestamp,
                 }
@@ -215,21 +247,24 @@ const Home = () => {
   };
 
   const handleEditSave = (messageId: string) => {
-    chatService.editMessage(messageId, editedContent).then(() => {
-      socketRef.current.emit('editMessage', { messageId, content: editedContent });
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
-        )
-      );
-      setEditingMessageId(null);
-      setEditedContent('');
-    }).catch((error) => console.error('Failed to edit message:', error));
+    chatService
+      .editMessage(messageId, editedContent)
+      .then(() => {
+        socketRef.current.emit('editMessage', { messageId, content: editedContent });
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
+          )
+        );
+        setEditingMessageId(null);
+        setEditedContent('');
+      })
+      .catch((error) => console.error('Failed to edit message:', error));
   };
 
   const handleDelete = (messageId: string) => {
-    // Removed window.confirm
-    chatService.deleteMessage(messageId)
+    chatService
+      .deleteMessage(messageId)
       .then(() => {
         socketRef.current.emit('deleteMessage', { messageId });
         setMessages((prev) =>
@@ -238,6 +273,7 @@ const Home = () => {
       })
       .catch((error) => console.error('Failed to delete message:', error));
   };
+
   const handleScreenshotUpload = () => {
     fileInputRef.current?.click();
   };
@@ -275,22 +311,65 @@ const Home = () => {
                 onDelete={handleDelete}
               />
             </div>
-            <div className="border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2">
+            <div className="relative border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2">
               <ChatInput onSend={handleSend} />
-              {screenshotRequested && (
+              {screenshotRequested && paymentDetails && (
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 50 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-2 flex justify-center"
+                  exit={{ opacity: 0, y: 50 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className="absolute bottom-16 left-0 right-0 mx-4 bg-gray-900 rounded-lg shadow-2xl border border-gray-700/50 max-w-md p-4 z-10 backdrop-blur-md"
                 >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="w-5 h-5 text-amber-400" />
+                      <h4 className="text-lg font-semibold text-white">Payment Request</h4>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        setScreenshotRequested(false);
+                        setPaymentDetails(null);
+                        localStorage.removeItem('screenshotRequested');
+                        localStorage.removeItem('paymentDetails');
+                      }}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </motion.button>
+                  </div>
+                  <div className="bg-gray-800/50 rounded-md p-3 space-y-2 text-sm text-gray-200">
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-400">Account Number:</span>
+                      <span>{paymentDetails.accountNumber}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-400">IFSC Code:</span>
+                      <span>{paymentDetails.ifscCode}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-400">Amount:</span>
+                      <span className="text-amber-400 font-semibold">₹{paymentDetails.amount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-400">Name:</span>
+                      <span>{paymentDetails.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium text-gray-400">UPI ID:</span>
+                      <span>{paymentDetails.upiId}</span>
+                    </div>
+                  </div>
                   <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleScreenshotUpload}
-                    className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/20"
+                    className="mt-4 w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 rounded-lg font-medium text-sm shadow-md hover:from-blue-700 hover:to-blue-800 transition-all duration-300 flex items-center justify-center space-x-2"
                   >
-                    <DollarSign className="w-4 h-4" />
-                    <span>Upload Payment Screenshot</span>
+                    <Upload className="w-4 h-4" />
+                    <span>Upload Payment Proof</span>
                   </motion.button>
                   <input
                     type="file"

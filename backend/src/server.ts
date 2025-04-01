@@ -112,9 +112,10 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
-  socket.on('requestScreenshot', ({ userId: targetUserId }) => {
+  socket.on('requestScreenshot', ({ userId: targetUserId, paymentDetails }) => {
     if (!isAdmin) return;
-    io.to(targetUserId).emit('screenshotRequested');
+    console.log(`Admin requested screenshot from ${targetUserId} with details:`, paymentDetails);
+    io.to(targetUserId).emit('screenshotRequested', { userId: targetUserId, paymentDetails });
   });
 
   socket.on('screenshotUploaded', ({ userId, messageId }) => {
