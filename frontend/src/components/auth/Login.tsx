@@ -13,9 +13,10 @@ interface LoginForm {
 
 interface LoginProps {
   onSuccess?: () => void;
+  onSignUpClick?: () => void;
 }
 
-const Login = ({ onSuccess }: LoginProps) => {
+const Login = ({ onSuccess, onSignUpClick }: LoginProps) => {
   const {
     register,
     handleSubmit,
@@ -136,7 +137,7 @@ const Login = ({ onSuccess }: LoginProps) => {
           Don't have an account?{' '}
           <button
             type="button"
-            onClick={() => navigate('/register')}
+            onClick={onSignUpClick}
             className="text-amber-400 hover:text-amber-300 transition-colors"
           >
             Sign up

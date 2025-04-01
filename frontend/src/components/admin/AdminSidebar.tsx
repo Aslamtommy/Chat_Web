@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, MessageSquare, Clock } from 'lucide-react';
 import adminService from '../Services/adminService';
 
 interface User {
@@ -24,7 +24,6 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   const [error, setError] = useState<string | null>(null);
   const previousSelectedUserId = useRef<string | null>(null);
   const debounceTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
-  const hasSynced = useRef(false);
   const socketConnected = useRef(false);
 
   const debouncedSearch = useCallback((query: string) => {
@@ -37,8 +36,11 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   }, []);
 
   const syncUnreadCounts = useCallback(() => {
-    if (socketConnected.current && !hasSynced.current) {
+    if (socketConnected.current) {
+      console.log('Requesting unread count sync...');
       socket.emit('syncUnreadCounts');
+    } else {
+      console.log('Socket not connected, cannot sync unread counts');
     }
   }, [socket]);
 
@@ -52,9 +54,12 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
           _id: user._id,
           username: user.username,
           lastMessageTimestamp: user.lastMessageTimestamp || null,
-          unreadCount: 0,
+          unreadCount: 0, // Initial value, to be updated by socket
         }));
+        console.log('Fetched users:', initialUsers);
         setUsers(initialUsers);
+        // Sync unread counts after setting initial users
+        syncUnreadCounts();
       } catch (err) {
         setError('Failed to load users');
         console.error('Error fetching users:', err);
@@ -67,13 +72,14 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
 
     const handleInitialUnreadCounts = (unreadCounts: { [key: string]: number }) => {
       console.log('Received initial unread counts:', unreadCounts);
-      setUsers((prev) =>
-        prev.map((user) => ({
+      setUsers((prevUsers) => {
+        const updatedUsers = prevUsers.map((user) => ({
           ...user,
           unreadCount: unreadCounts[user._id] || 0,
-        }))
-      );
-      hasSynced.current = true;
+        }));
+        console.log('Updated users with unread counts:', updatedUsers);
+        return updatedUsers;
+      });
     };
 
     const handleUpdateUnreadCount = ({ userId, unreadCount }: { userId: string; unreadCount: number }) => {
@@ -87,6 +93,20 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       );
     };
 
+    const handleNewMessage = (messagePayload: any) => {
+      console.log('New message received:', messagePayload);
+      const userId = messagePayload.chatId;
+      if (selectedUserId !== userId) {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user._id === userId
+              ? { ...user, unreadCount: (user.unreadCount || 0) + 1 }
+              : user
+          )
+        );
+      }
+    };
+
     const handleConnect = () => {
       console.log('Socket connected');
       socketConnected.current = true;
@@ -96,15 +116,14 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     const handleDisconnect = () => {
       console.log('Socket disconnected');
       socketConnected.current = false;
-      hasSynced.current = false;
     };
 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('initialUnreadCounts', handleInitialUnreadCounts);
     socket.on('updateUnreadCount', handleUpdateUnreadCount);
+    socket.on('newMessage', handleNewMessage);
 
-    // Initial sync attempt
     if (socket.connected) {
       socketConnected.current = true;
       syncUnreadCounts();
@@ -115,6 +134,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       socket.off('disconnect', handleDisconnect);
       socket.off('initialUnreadCounts', handleInitialUnreadCounts);
       socket.off('updateUnreadCount', handleUpdateUnreadCount);
+      socket.off('newMessage', handleNewMessage);
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current);
       }
@@ -138,7 +158,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
 
   const handleUserClick = async (userId: string) => {
     try {
-      const user = users.find(u => u._id === userId);
+      const user = users.find((u) => u._id === userId);
       if (user?.unreadCount && user.unreadCount > 0) {
         await adminService.markMessagesAsRead(userId);
         socket.emit('markMessagesAsRead', { chatId: userId });
@@ -157,55 +177,81 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   );
 
   return (
-    <div className={`${isMobile ? 'w-full' : 'w-72'} bg-black/40 backdrop-blur-md border-r border-white/10 h-full overflow-y-auto`}>
-      <div className="p-4 border-b border-white/10">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/30 w-4 h-4" />
+    <div className={`${isMobile ? 'w-full' : 'w-80'} bg-gradient-to-br from-black/80 via-black/60 to-black/40 backdrop-blur-xl border-r border-white/10 h-full overflow-y-auto shadow-2xl`}>
+      <div className="p-6 border-b border-white/10">
+        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-amber-300 mb-6">Admin Dashboard</h2>
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5 group-hover:text-amber-500 transition-colors duration-200" />
           <input
             type="text"
-            placeholder="Search users"
-            className="w-full p-2.5 pl-10 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/30"
+            placeholder="Search users..."
+            className="w-full p-3.5 pl-12 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 transition-all duration-200 hover:border-white/20"
             onChange={(e) => debouncedSearch(e.target.value)}
           />
         </div>
       </div>
-      
-      <div className="p-2 space-y-1">
+
+      <div className="p-4 space-y-2">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
-            <Loader2 className="w-6 h-6 text-amber-500 animate-spin" />
+            <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
           </div>
         ) : error ? (
-          <div className="flex items-center justify-center h-32 text-red-500">
-            {error}
-          </div>
+          <div className="flex items-center justify-center h-32 text-red-500 bg-red-500/10 rounded-xl p-4">{error}</div>
         ) : filteredUsers.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-white/70">
-            No users found
+          <div className="flex flex-col items-center justify-center h-32 text-white/70 space-y-3">
+            <MessageSquare className="w-10 h-10 text-amber-500/50" />
+            <p className="text-lg">No users found</p>
           </div>
         ) : (
           <AnimatePresence>
             {filteredUsers.map((user) => (
               <motion.div
                 key={user._id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handleUserClick(user._id)}
-                className={`p-3 rounded-lg cursor-pointer flex items-center justify-between ${
-                  selectedUserId === user._id ? 'bg-amber-500/20' : 'hover:bg-white/5'
+                className={`p-4 rounded-xl cursor-pointer flex items-center justify-between transition-all duration-300 ${
+                  selectedUserId === user._id
+                    ? 'bg-gradient-to-r from-amber-500/20 to-amber-500/10 shadow-lg shadow-amber-500/20'
+                    : 'hover:bg-white/10'
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-white/5 text-white/70 flex items-center justify-center">
+                <div className="flex items-center space-x-4">
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold transition-all duration-300 ${
+                      selectedUserId === user._id
+                        ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white'
+                        : 'bg-white/10 text-white/70'
+                    }`}
+                  >
                     {user.username.charAt(0).toUpperCase()}
+                   </div>
+                  <div className="flex flex-col">
+                    <p className="font-medium text-white/90">{user.username}</p>
+                    {user.lastMessageTimestamp && (
+                      <div className="flex items-center space-x-1 text-xs text-white/50">
+                        <Clock className="w-3 h-3" />
+                        <span>
+                          {new Date(user.lastMessageTimestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <p className="font-medium text-white/70">{user.username}</p>
                 </div>
                 {user.unreadCount > 0 && selectedUserId !== user._id && (
-                  <span className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs">
-                    {user.unreadCount}
-                  </span>
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center space-x-2">
+                    <MessageSquare className="w-4 h-4 text-amber-500" />
+                    <span className="w-6 h-6 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-lg shadow-amber-500/20">
+                      {user.unreadCount}
+                    </span>
+                  </motion.div>
                 )}
               </motion.div>
             ))}
