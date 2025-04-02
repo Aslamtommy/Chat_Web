@@ -11,6 +11,7 @@ interface ApiResponse<T> {
 
 const handleApiError = (error: any): string => {
   if (error.response) {
+    console.log(error)
     // Server responded with error
     const errorMessage = error.response.data.error;
     switch (error.response.status) {
