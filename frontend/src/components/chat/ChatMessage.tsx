@@ -103,7 +103,7 @@ const ChatMessage: React.FC<MessageProps> = ({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        console.log('Closing menu for message:', _id);
+ 
         setIsMenuOpen(false);
       }
     };
@@ -280,7 +280,10 @@ const ChatMessage: React.FC<MessageProps> = ({
       <DeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={() => onDelete?.()}
+        onConfirm={() => {
+          console.log('Delete confirmed for message:', _id); // Add this
+          onDelete?.();
+        }}
         messageId={_id}
       />
     </>

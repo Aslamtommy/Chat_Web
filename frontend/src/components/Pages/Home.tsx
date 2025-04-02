@@ -221,15 +221,17 @@ const Home = () => {
   };
 
   const handleDelete = (messageId: string) => {
-    chatService
-      .deleteMessage(messageId)
-      .then(() => {
-        socketRef.current?.emit('deleteMessage', { messageId });
+    console.log('handleDelete called in Home for messageId:', messageId);
+    socketRef.current?.emit('deleteMessage', { messageId }, (response: { status: string }) => {
+      if (response.status === 'success') {
+        console.log('Message deleted successfully via socket, updating state:', messageId);
         setMessages((prev) =>
           prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
         );
-      })
-      .catch((error) => console.error('Failed to delete message:', error));
+      } else {
+        console.error('Socket deletion failed:', response);
+      }
+    });
   };
 
   return (

@@ -173,6 +173,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
 
     const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
+      console.log('Admin received messageDeleted for messageId:', messageId);
+  console.log('Current message IDs:', messages.map(m => m._id));
       setMessages((prev) =>
         prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
       );
@@ -285,15 +287,17 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const handleDelete = (messageId: string) => {
-    chatService
-      .deleteMessageAdmin(messageId)
-      .then(() => {
-        socket.emit('deleteMessage', { messageId });
+    console.log('handleDelete called in AdminChatWindow for messageId:', messageId);
+    socket.emit('deleteMessage', { messageId }, (response: { status: string }) => {
+      if (response.status === 'success') {
+        console.log('Message deleted successfully via socket, updating state:', messageId);
         setMessages((prev) =>
           prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
         );
-      })
-      .catch((error) => console.error('Failed to delete message:', error));
+      } else {
+        console.error('Socket deletion failed:', response);
+      }
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

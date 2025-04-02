@@ -181,30 +181,28 @@ io.on('connection', (socket: Socket) => {
   });
 
   socket.on('deleteMessage', async ({ messageId }, ack) => {
+    console.log('Server received deleteMessage event for messageId:', messageId); // Add this
     try {
       const senderId = socket.data.user.id;
       const chat = await ChatThread.findOne({ 'messages._id': messageId }) as IChatThread | null;
       if (!chat) {
         throw new Error('Chat thread not found');
       }
-
-      // Find the message in the messages array
       const message = chat.messages.find((msg: IMessage) => msg._id?.toString() === messageId);
       if (!message) {
         throw new Error('Message not found');
       }
-
       if (message.sender_id.toString() !== senderId) {
         throw new Error('You can only delete your own messages');
       }
-
       await ChatService.deleteMessage(messageId);
-      
       const targetUserId = chat.user_id.toString();
+      console.log(`Emitting messageDeleted to user ${targetUserId} and admin-room for messageId: ${messageId}`); // Already present
       io.to(targetUserId).emit('messageDeleted', { messageId });
       io.to('admin-room').emit('messageDeleted', { messageId });
       ack?.({ status: 'success' });
     } catch (error) {
+      console.error('Error in deleteMessage:', (error as Error).message);
       socket.emit('messageError', { error: (error as Error).message });
       ack?.({ status: 'error', error: (error as Error).message });
     }

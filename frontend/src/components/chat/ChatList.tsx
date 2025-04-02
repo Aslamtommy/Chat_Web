@@ -64,7 +64,10 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(
                 ? () => onEditStart(message._id, message.content)
                 : undefined
             }
-            onDelete={message.isSelf && onDelete ? () => onDelete(message._id) : undefined}
+            onDelete={message.isSelf && onDelete ? () => {
+              console.log('onDelete triggered for message:', message._id); // Add this
+              onDelete(message._id);
+            } : undefined}
           />
         ))}
       </div>
