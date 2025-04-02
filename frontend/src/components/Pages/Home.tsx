@@ -292,12 +292,14 @@ const Home = () => {
 
   return (
     <div className="flex flex-col h-screen bg-black font-serif">
-      <ChatHeader onProfileClick={() => setIsProfileModalOpen(true)} />
-      <div className="flex-1 flex flex-col mx-1 sm:mx-4 mb-2 sm:mb-4 mt-1 sm:mt-2 overflow-hidden rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10">
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <ChatHeader onProfileClick={() => setIsProfileModalOpen(true)} />
+      </div>
+      <div className="flex-1 flex flex-col mx-1 sm:mx-4 mb-2 sm:mb-4 mt-1 sm:mt-2 overflow-hidden rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10 pt-[60px]">
         {activeTab === 'chats' && (
           <>
             <div
-              className="flex-1 overflow-y-auto bg-gradient-to-b from-black/40 to-black/20 px-2 sm:px-6"
+              className="flex-1 overflow-y-auto bg-gradient-to-b from-black/40 to-black/20 px-2 sm:px-6 pb-[80px]"
               ref={chatContainerRef}
             >
               <ChatList
@@ -311,7 +313,7 @@ const Home = () => {
                 onDelete={handleDelete}
               />
             </div>
-            <div className="relative border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2">
+            <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2 z-50">
               <ChatInput onSend={handleSend} />
               {screenshotRequested && paymentDetails && (
                 <motion.div
