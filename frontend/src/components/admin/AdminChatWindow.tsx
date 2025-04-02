@@ -160,7 +160,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             pr._id === paymentRequestId ? { ...pr, status: 'uploaded', screenshotUrl } : pr
           )
         );
-        fetchChatHistory();
+        fetchChatHistory(); // Refresh chat to include any related messages
       }
     };
 
@@ -173,6 +173,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
 
     const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
+      console.log('Admin received messageDeleted for messageId:', messageId);
       setMessages((prev) =>
         prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
       );
@@ -213,7 +214,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       setShowRequestModal(false);
       setTimeout(() => setShowToast(false), 3000);
       setPaymentDetails({ accountNumber: '', ifscCode: '', amount: '', name: '', upiId: '' });
-      fetchPaymentRequests();
+      fetchPaymentRequests(); // Refresh payment requests
     } catch (error) {
       console.error('Failed to request screenshot:', error);
     }
@@ -245,9 +246,12 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           content: messageType === 'text' ? content : await convertFileToBase64(content as File),
           tempId,
         };
+        console.log('Sending message via socket:', messageData);
+
         socket.emit('sendMessage', messageData, (response: { status: string; message?: any }) => {
           if (response.status === 'success') {
             const savedMessage = response.message;
+            console.log('Message sent successfully:', savedMessage);
             setMessages((prev) =>
               prev.map((msg) =>
                 msg._id === tempId
@@ -261,18 +265,21 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                   : msg
               )
             );
+            // Emit updateUserOrder to ensure AdminSidebar updates with the exact server timestamp
             socket.emit('updateUserOrder', {
               userId: userId,
               timestamp: savedMessage.timestamp,
             });
             scrollToBottom();
           } else {
+            console.error('Failed to send message via socket:', response);
             setMessages((prev) =>
               prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
             );
           }
         });
       } catch (error) {
+        console.error('Error sending message:', error);
         setMessages((prev) =>
           prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
         );
@@ -312,11 +319,15 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const handleDelete = (messageId: string) => {
+    console.log('handleDelete called in AdminChatWindow for messageId:', messageId);
     socket.emit('deleteMessage', { messageId }, (response: { status: string }) => {
       if (response.status === 'success') {
+        console.log('Message deleted successfully via socket, updating state:', messageId);
         setMessages((prev) =>
           prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
         );
+      } else {
+        console.error('Socket deletion failed:', response);
       }
     });
   };
@@ -337,64 +348,62 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   return (
-    <div className="flex flex-col h-screen bg-black/40 backdrop-blur-sm">
+    <div className="flex flex-col h-screen bg-black/40 backdrop-blur-sm relative">
       {userId ? (
         <>
           {/* Fixed Header */}
-          <div className="fixed top-0 left-0 right-0 z-10 p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10">
+          <div className="fixed top-0 left-0 right-0 z-20 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10 px-3 py-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 min-w-0">
                 {isMobile && onBack && (
                   <button
                     onClick={onBack}
-                    className="md:hidden p-1.5 sm:p-2 mr-1 sm:mr-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
+                    className="md:hidden p-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 flex-shrink-0"
                   >
-                    <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <ArrowLeft className="w-5 h-5" />
                   </button>
                 )}
-                <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
+                <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30 flex-shrink-0">
                   <span className="text-sm font-medium text-amber-500">
                     {username?.charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <h3 className="text-base font-medium text-white">{username || 'User'}</h3>
+                <h3 className="text-base font-medium text-white truncate">{username || 'User'}</h3>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 flex-shrink-0">
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowUserDetails(true)}
-                  className="p-2 rounded-xl bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 transition-all duration-300 flex items-center space-x-2"
+                  className="p-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
                   title="View User Details"
                 >
                   <User className="w-4 h-4" />
-                  <span className="text-sm font-medium hidden sm:inline">User Details</span>
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowPaymentRequests(true)}
-                  className="p-2 rounded-xl bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 transition-all duration-300 flex items-center space-x-2"
+                  className="p-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
                   title="View Payment Requests"
                 >
                   <Image className="w-4 h-4" />
-                  <span className="text-sm font-medium hidden sm:inline">Payments</span>
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowRequestModal(true)}
-                  className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-2 sm:px-4 py-2 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/30"
+                  className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-3 py-1.5 rounded-lg hover:from-amber-700 hover:to-amber-800 border border-amber-500/30"
+                  title="Request Payment Screenshot"
                 >
                   <DollarSign className="w-4 h-4" />
-                  <span className="hidden sm:inline">Request Payment Screenshot</span>
                 </motion.button>
               </div>
             </div>
           </div>
-
-          {/* Scrollable Message List with Responsive Padding */}
-          <div className="flex-1 overflow-y-auto pt-[60px] pb-[80px] md:pt-[70px] md:pb-[70px]">
+  
+          {/* Scrollable Chat List */}
+          <div className="flex-1 overflow-y-auto pt-14 pb-20 px-2">
             <ChatList
               messages={messages}
               editingMessageId={editingMessageId}
@@ -407,12 +416,12 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               ref={chatContainerRef}
             />
           </div>
-
-          {/* Fixed Chat Input with Adjusted Positioning */}
-          <div className="fixed bottom-12 left-0 right-0 p-4 bg-black/20 backdrop-blur-sm border-t border-white/10 z-10">
+  
+          {/* Fixed Input */}
+          <div className="fixed bottom-0 left-0 right-0 z-10 bg-black/20 backdrop-blur-sm border-t border-white/10 p-2">
             <ChatInput onSend={handleSend} />
           </div>
-
+  
           {/* Payment Request Modal */}
           <AnimatePresence>
             {showRequestModal && (
@@ -420,19 +429,19 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
               >
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 w-11/12 max-w-md mx-4"
+                  className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-md"
                 >
-                  <h4 className="text-lg font-semibold text-white mb-4">Request Payment Screenshot</h4>
-                  <p className="text-white/80 text-sm mb-6">
-                    Enter payment details to request a screenshot from {username || 'this user'}.
+                  <h4 className="text-lg font-semibold text-white mb-3">Request Payment Screenshot</h4>
+                  <p className="text-white/80 text-sm mb-4">
+                    Enter payment details for {username || 'this user'}.
                   </p>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <input
                       type="text"
                       name="accountNumber"
@@ -463,7 +472,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                       value={paymentDetails.name}
                       onChange={handleInputChange}
                       placeholder="Account Holder Name"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-White border border-amber-500/30 focus:outline-none focus:border-amber-500"
                     />
                     <input
                       type="text"
@@ -474,12 +483,12 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                       className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
                     />
                   </div>
-                  <div className="flex justify-end space-x-3 mt-6">
+                  <div className="flex justify-end space-x-2 mt-4">
                     <motion.button
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => setShowRequestModal(false)}
-                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-4 py-2 rounded-lg shadow-md hover:from-gray-700 hover:to-gray-800 transition-all duration-300 flex items-center space-x-2 text-sm font-medium"
+                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-3 py-1.5 rounded-lg hover:from-gray-700 hover:to-gray-800 flex items-center space-x-1 text-sm"
                     >
                       <X className="w-4 h-4" />
                       <span>Cancel</span>
@@ -489,7 +498,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                       whileTap={{ scale: 0.97 }}
                       onClick={handleRequestScreenshot}
                       disabled={!isPaymentDetailsValid()}
-                      className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-all duration-300 flex items-center space-x-2 text-sm font-medium ${
+                      className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1 text-sm ${
                         !isPaymentDetailsValid() ? 'opacity-60 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-800'
                       }`}
                     >
@@ -501,7 +510,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               </motion.div>
             )}
           </AnimatePresence>
-
+  
           {/* Payment Requests View Modal */}
           <AnimatePresence>
             {showPaymentRequests && (
@@ -509,40 +518,40 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
               >
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 w-11/12 max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
+                  className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto"
                 >
-                  <div className="flex justify-between items-center mb-6">
-                    <h4 className="text-xl font-semibold text-white">Payment Requests for {username}</h4>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-semibold text-white">Payment Requests for {username}</h4>
                     <button
                       onClick={() => setShowPaymentRequests(false)}
-                      className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+                      className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {paymentRequests
                       .filter((pr) => pr.userId._id === userId)
                       .map((pr) => (
                         <motion.div
                           key={pr._id}
-                          initial={{ opacity: 0, y: 20 }}
+                          initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="p-4 bg-gray-800 rounded-lg border border-white/10"
+                          className="p-3 bg-gray-800 rounded-lg border border-white/10"
                         >
-                          <div className="space-y-2 text-sm text-gray-200">
+                          <div className="space-y-1 text-sm text-gray-200">
                             <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">Account Number:</span>
+                              <span className="font-medium text-gray-400">Account:</span>
                               <span>{pr.paymentDetails.accountNumber}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">IFSC Code:</span>
+                              <span className="font-medium text-gray-400">IFSC:</span>
                               <span>{pr.paymentDetails.ifscCode}</span>
                             </div>
                             <div className="flex justify-between">
@@ -554,7 +563,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                               <span>{pr.paymentDetails.name}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">UPI ID:</span>
+                              <span className="font-medium text-gray-400">UPI:</span>
                               <span>{pr.paymentDetails.upiId}</span>
                             </div>
                             <div className="flex justify-between">
@@ -569,7 +578,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                                   href={pr.screenshotUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-amber-400 hover:underline flex items-center space-x-2"
+                                  className="text-amber-400 hover:underline flex items-center space-x-1 text-sm"
                                 >
                                   <Image className="w-4 h-4" />
                                   <span>View Screenshot</span>
@@ -580,14 +589,14 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                         </motion.div>
                       ))}
                     {paymentRequests.filter((pr) => pr.userId._id === userId).length === 0 && (
-                      <p className="text-white/70 text-center">No payment requests found for this user.</p>
+                      <p className="text-white/70 text-center text-sm">No payment requests found.</p>
                     )}
                   </div>
                 </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
-
+  
           {/* Toast Notification */}
           <AnimatePresence>
             {showToast && (
@@ -595,33 +604,33 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-4 right-4 md:bottom-6 md:right-6 lg:bottom-8 lg:right-8 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl shadow-md text-sm font-medium flex items-center space-x-2"
+                className="fixed bottom-16 left-2 right-2 md:bottom-4 md:right-4 md:left-auto bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md text-sm flex items-center justify-center space-x-2 z-30"
               >
                 <DollarSign className="w-4 h-4" />
-                <span>Screenshot request sent or received</span>
+                <span>Screenshot request sent/received</span>
               </motion.div>
             )}
           </AnimatePresence>
-
+  
           {/* User Details Modal */}
           {showUserDetails && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 w-11/12 max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
+                className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto"
               >
-                <div className="flex justify-between items-center mb-6">
-                  <h4 className="text-xl font-semibold text-white">User Details</h4>
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-lg font-semibold text-white">User Details</h4>
                   <button
                     onClick={() => setShowUserDetails(false)}
-                    className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+                    className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -633,7 +642,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-white/70 text-lg">{isMobile ? 'Select a user to start chatting' : 'No user selected'}</p>
+          <p className="text-white/70 text-base">{isMobile ? 'Select a user to chat' : 'No user selected'}</p>
         </div>
       )}
     </div>
