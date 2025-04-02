@@ -160,7 +160,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             pr._id === paymentRequestId ? { ...pr, status: 'uploaded', screenshotUrl } : pr
           )
         );
-        fetchChatHistory(); // Refresh chat to include any related messages
+        fetchChatHistory();
       }
     };
 
@@ -173,7 +173,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
 
     const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
-      console.log('Admin received messageDeleted for messageId:', messageId);
       setMessages((prev) =>
         prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
       );
@@ -214,7 +213,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       setShowRequestModal(false);
       setTimeout(() => setShowToast(false), 3000);
       setPaymentDetails({ accountNumber: '', ifscCode: '', amount: '', name: '', upiId: '' });
-      fetchPaymentRequests(); // Refresh payment requests
+      fetchPaymentRequests();
     } catch (error) {
       console.error('Failed to request screenshot:', error);
     }
@@ -246,12 +245,9 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           content: messageType === 'text' ? content : await convertFileToBase64(content as File),
           tempId,
         };
-        console.log('Sending message via socket:', messageData);
-
         socket.emit('sendMessage', messageData, (response: { status: string; message?: any }) => {
           if (response.status === 'success') {
             const savedMessage = response.message;
-            console.log('Message sent successfully:', savedMessage);
             setMessages((prev) =>
               prev.map((msg) =>
                 msg._id === tempId
@@ -265,21 +261,18 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                   : msg
               )
             );
-            // Emit updateUserOrder to ensure AdminSidebar updates with the exact server timestamp
             socket.emit('updateUserOrder', {
               userId: userId,
               timestamp: savedMessage.timestamp,
             });
             scrollToBottom();
           } else {
-            console.error('Failed to send message via socket:', response);
             setMessages((prev) =>
               prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
             );
           }
         });
       } catch (error) {
-        console.error('Error sending message:', error);
         setMessages((prev) =>
           prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
         );
@@ -319,15 +312,11 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const handleDelete = (messageId: string) => {
-    console.log('handleDelete called in AdminChatWindow for messageId:', messageId);
     socket.emit('deleteMessage', { messageId }, (response: { status: string }) => {
       if (response.status === 'success') {
-        console.log('Message deleted successfully via socket, updating state:', messageId);
         setMessages((prev) =>
           prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
         );
-      } else {
-        console.error('Socket deletion failed:', response);
       }
     });
   };
@@ -348,10 +337,11 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-black/40 backdrop-blur-sm relative">
+    <div className="flex flex-col h-screen bg-black/40 backdrop-blur-sm">
       {userId ? (
         <>
-          <div className="p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10 relative">
+          {/* Fixed Header */}
+          <div className="fixed top-0 left-0 right-0 z-10 p-3 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 {isMobile && onBack && (
@@ -402,18 +392,24 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               </div>
             </div>
           </div>
-          <ChatList
-            messages={messages}
-            editingMessageId={editingMessageId}
-            editedContent={editedContent}
-            setEditedContent={setEditedContent}
-            onEditStart={handleEditStart}
-            onEditSave={handleEditSave}
-            onEditCancel={() => setEditingMessageId(null)}
-            onDelete={handleDelete}
-            ref={chatContainerRef}
-          />
-          <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-sm relative">
+
+          {/* Scrollable Message List with Responsive Padding */}
+          <div className="flex-1 overflow-y-auto pt-[60px] pb-[80px] md:pt-[70px] md:pb-[70px]">
+            <ChatList
+              messages={messages}
+              editingMessageId={editingMessageId}
+              editedContent={editedContent}
+              setEditedContent={setEditedContent}
+              onEditStart={handleEditStart}
+              onEditSave={handleEditSave}
+              onEditCancel={() => setEditingMessageId(null)}
+              onDelete={handleDelete}
+              ref={chatContainerRef}
+            />
+          </div>
+
+          {/* Fixed Chat Input with Adjusted Positioning */}
+          <div className="fixed bottom-12 left-0 right-0 p-4 bg-black/20 backdrop-blur-sm border-t border-white/10 z-10">
             <ChatInput onSend={handleSend} />
           </div>
 
