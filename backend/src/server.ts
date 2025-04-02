@@ -214,23 +214,10 @@ io.on('connection', (socket: Socket) => {
       const senderRole = socket.data.user.role;
       const isAdmin = senderRole === 'admin';
       const chatThreadId = isAdmin ? targetUserId : senderId;
-
-      if (!['text', 'image', 'voice'].includes(messageType)) {
-        throw new Error('Invalid message type');
-      }
-
-      const updatedChat = await ChatService.saveMessage(
-        chatThreadId,
-        senderId,
-        messageType,
-        content
-      );
-
+  
+      const updatedChat = await ChatService.saveMessage(chatThreadId, senderId, messageType, content);
       const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
-      if (!newMessage || !newMessage._id) {
-        throw new Error('Message ID is missing or invalid');
-      }
-
+  
       const messagePayload = {
         _id: newMessage._id.toString(),
         chatId: updatedChat._id.toString(),
@@ -242,28 +229,30 @@ io.on('connection', (socket: Socket) => {
         isAdmin,
         read: isAdmin ? true : false,
       };
-
+  
       if (isAdmin) {
         io.to(targetUserId).emit('newMessage', messagePayload);
       } else {
         io.to('admin-room').emit('newMessage', messagePayload);
         const unreadCount = await ChatRepository.getUnreadCount(chatThreadId);
-        console.log(`User message sent, updating unread count for ${chatThreadId} to ${unreadCount}`);
-        io.to('admin-room').emit('updateUnreadCount', {
-          userId: chatThreadId,
-          unreadCount,
-        });
-        syncUnreadCounts(socket); // Ensure all admins get updated counts
+        io.to('admin-room').emit('updateUnreadCount', { userId: chatThreadId, unreadCount });
+        syncUnreadCounts(socket);
       }
       socket.emit('messageDelivered', messagePayload);
       ack?.({ status: 'success', message: messagePayload });
+  
+      // Emit updateUserOrder for real-time sorting
+      console.log(`Emitting updateUserOrder for user ${chatThreadId} with timestamp ${newMessage.timestamp}`);
+      io.to('admin-room').emit('updateUserOrder', {
+        userId: chatThreadId,
+        timestamp: newMessage.timestamp,
+      });
     } catch (error: any) {
       console.error('Message sending error:', error);
       socket.emit('messageError', { tempId, error: error.message });
       ack?.({ status: 'error', error: error.message });
     }
   });
-
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${userId}`);
     if (isAdmin) {

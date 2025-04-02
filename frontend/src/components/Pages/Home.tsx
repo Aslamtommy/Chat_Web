@@ -12,7 +12,7 @@ interface Message {
   _id: string;
   content: string;
   isSelf: boolean;
-  messageType: 'text' | 'image' | 'voice'; // Removed 'screenshot'
+  messageType: 'text' | 'image' | 'voice';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   duration?: number;
   timestamp?: string;
@@ -32,7 +32,7 @@ const Home = () => {
   const navigate = useNavigate();
   const pendingMessages = useRef<Set<string>>(new Set());
   const userId = useRef<string>('');
-  const { setUnreadCount } :any= useNotification();
+  const { setUnreadCount }: any = useNotification();
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
@@ -75,7 +75,7 @@ const Home = () => {
 
     socketRef.current.on('paymentRequest', () => {
       console.log('Received paymentRequest');
-      setUnreadCount((prev: any) => prev + 1); // Explicitly typed prev as number
+      setUnreadCount((prev: any) => prev + 1);
     });
 
     socketRef.current.on('messageEdited', (updatedMessage: { _id: string; content: string; isEdited: boolean }) => {
@@ -152,6 +152,7 @@ const Home = () => {
       if (!socketRef.current || !userId.current) return;
 
       const tempId = Date.now().toString();
+      const tempTimestamp = new Date().toISOString();
       const tempMessage: Message = {
         _id: tempId,
         content: messageType === 'text' ? (content as string) : 'Uploading...',
@@ -160,7 +161,7 @@ const Home = () => {
         status: 'sending',
         senderId: userId.current,
         duration,
-        timestamp: new Date().toISOString(),
+        timestamp: tempTimestamp,
       };
 
       pendingMessages.current.add(tempId);
@@ -171,23 +172,38 @@ const Home = () => {
         const response = await chatService.sendMessage(messageType, content);
         const savedMessage = response.messages[response.messages.length - 1];
 
+        const updatedMessage: Message = {
+          _id: savedMessage._id.toString(),
+          content: savedMessage.content,
+          isSelf: true,
+          messageType: messageType,
+          status: 'delivered' as const,
+          senderId: userId.current,
+          duration: savedMessage.duration || duration,
+          timestamp: savedMessage.timestamp,
+        };
+
         setMessages((prev) =>
           prev.map((msg) =>
-            msg._id === tempId
-              ? {
-                  _id: savedMessage._id.toString(),
-                  content: savedMessage.content,
-                  isSelf: true,
-                  messageType: msg.messageType,
-                  status: 'delivered' as const,
-                  senderId: userId.current,
-                  duration: savedMessage.duration || duration,
-                  timestamp: savedMessage.timestamp,
-                }
-              : msg
+            msg._id === tempId ? updatedMessage : msg
           )
         );
         pendingMessages.current.delete(tempId);
+
+        // Emit sendMessage event via Socket.IO to notify the admin in real-time
+        socketRef.current.emit('sendMessage', {
+          targetUserId: 'admin', // Assuming messages are sent to admin
+          messageType,
+          content: savedMessage.content,
+          tempId: savedMessage._id, // Use the real ID here
+        }, (ack: { status: string; message?: any }) => {
+          if (ack.status === 'success') {
+            console.log('Message acknowledged by server:', ack.message);
+          } else {
+            console.error('Failed to acknowledge message:', ack);
+          }
+        });
+
       } catch (error) {
         console.error('Failed to send message:', error);
         setMessages((prev) =>
@@ -267,7 +283,6 @@ const Home = () => {
         isOpen={isProfileModalOpen}
         onClose={() => {
           setIsProfileModalOpen(false);
-          // Removed setActiveTab since it's not defined
         }}
       />
     </div>

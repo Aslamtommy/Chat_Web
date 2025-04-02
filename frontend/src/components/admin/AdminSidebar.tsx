@@ -44,6 +44,16 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     }
   }, [socket]);
 
+  const sortUsersByTimestamp = useCallback((usersList: User[]) => {
+    const sorted = usersList.sort((a, b) => {
+      if (!a.lastMessageTimestamp) return 1; // No timestamp -> bottom
+      if (!b.lastMessageTimestamp) return -1;
+      return new Date(b.lastMessageTimestamp).getTime() - new Date(a.lastMessageTimestamp).getTime();
+    });
+    console.log('Sorted users:', sorted.map((u) => ({ id: u._id, timestamp: u.lastMessageTimestamp })));
+    return sorted;
+  }, []);
+
   useEffect(() => {
     const fetchUserList = async () => {
       try {
@@ -54,11 +64,10 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
           _id: user._id,
           username: user.username,
           lastMessageTimestamp: user.lastMessageTimestamp || null,
-          unreadCount: 0, // Initial value, to be updated by socket
+          unreadCount: 0,
         }));
         console.log('Fetched users:', initialUsers);
-        setUsers(initialUsers);
-        // Sync unread counts after setting initial users
+        setUsers(sortUsersByTimestamp(initialUsers));
         syncUnreadCounts();
       } catch (err) {
         setError('Failed to load users');
@@ -70,6 +79,32 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
 
     fetchUserList();
 
+    // Handle real-time updates for user order (both user-to-admin and admin-to-user messages)
+    const handleUpdateUserOrder = ({ userId, timestamp }: { userId: string; timestamp: string }) => {
+      console.log('Received updateUserOrder - userId:', userId, 'timestamp:', timestamp);
+      setUsers((prev) => {
+        const updatedUsers = prev.map((user) =>
+          user._id === userId
+            ? {
+                ...user,
+                lastMessageTimestamp: timestamp, // Update timestamp for the user
+                unreadCount: selectedUserId === userId ? 0 : (user.unreadCount || 0) + 1, // Reset if selected, increment if not
+              }
+            : user
+        );
+        const sortedUsers = sortUsersByTimestamp([...updatedUsers]);
+        console.log(
+          'After updateUserOrder, top user:',
+          sortedUsers[0]?.username,
+          'timestamp:',
+          sortedUsers[0]?.lastMessageTimestamp,
+          'selectedUserId:',
+          selectedUserId
+        );
+        return sortedUsers;
+      });
+    };
+
     const handleInitialUnreadCounts = (unreadCounts: { [key: string]: number }) => {
       console.log('Received initial unread counts:', unreadCounts);
       setUsers((prevUsers) => {
@@ -77,34 +112,20 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
           ...user,
           unreadCount: unreadCounts[user._id] || 0,
         }));
-        console.log('Updated users with unread counts:', updatedUsers);
-        return updatedUsers;
+        return sortUsersByTimestamp(updatedUsers);
       });
     };
 
     const handleUpdateUnreadCount = ({ userId, unreadCount }: { userId: string; unreadCount: number }) => {
       console.log('Updating unread count for', userId, 'to', unreadCount);
-      setUsers((prev) =>
-        prev.map((user) =>
+      setUsers((prev) => {
+        const updatedUsers = prev.map((user) =>
           user._id === userId && selectedUserId !== userId
             ? { ...user, unreadCount }
             : user
-        )
-      );
-    };
-
-    const handleNewMessage = (messagePayload: any) => {
-      console.log('New message received:', messagePayload);
-      const userId = messagePayload.chatId;
-      if (selectedUserId !== userId) {
-        setUsers((prev) =>
-          prev.map((user) =>
-            user._id === userId
-              ? { ...user, unreadCount: (user.unreadCount || 0) + 1 }
-              : user
-          )
         );
-      }
+        return sortUsersByTimestamp(updatedUsers);
+      });
     };
 
     const handleConnect = () => {
@@ -122,7 +143,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     socket.on('disconnect', handleDisconnect);
     socket.on('initialUnreadCounts', handleInitialUnreadCounts);
     socket.on('updateUnreadCount', handleUpdateUnreadCount);
-    socket.on('newMessage', handleNewMessage);
+    socket.on('updateUserOrder', handleUpdateUserOrder);
 
     if (socket.connected) {
       socketConnected.current = true;
@@ -134,12 +155,13 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       socket.off('disconnect', handleDisconnect);
       socket.off('initialUnreadCounts', handleInitialUnreadCounts);
       socket.off('updateUnreadCount', handleUpdateUnreadCount);
-      socket.off('newMessage', handleNewMessage);
+      socket.off('updateUserOrder', handleUpdateUserOrder);
+      
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current);
       }
     };
-  }, [socket, selectedUserId, syncUnreadCounts]);
+  }, [socket, selectedUserId, syncUnreadCounts, sortUsersByTimestamp]);
 
   useEffect(() => {
     if (previousSelectedUserId.current && !selectedUserId) {
@@ -179,7 +201,6 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   return (
     <div className={`${isMobile ? 'w-full' : 'w-80'} bg-gradient-to-br from-black/80 via-black/60 to-black/40 backdrop-blur-xl border-r border-white/10 h-full overflow-y-auto shadow-2xl`}>
       <div className="p-6 border-b border-white/10">
- 
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5 group-hover:text-amber-500 transition-colors duration-200" />
           <input
@@ -229,7 +250,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
                     }`}
                   >
                     {user.username.charAt(0).toUpperCase()}
-                   </div>
+                  </div>
                   <div className="flex flex-col">
                     <p className="font-medium text-white/90">{user.username}</p>
                     {user.lastMessageTimestamp && (

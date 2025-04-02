@@ -86,7 +86,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   const fetchPaymentRequests = useCallback(async () => {
     try {
       const token = localStorage.getItem('adminToken');
-      const response :any= await axios.get(`${import.meta.env.VITE_API_URL}/admin/payment-requests`, {
+      const response: any = await axios.get(`${import.meta.env.VITE_API_URL}/admin/payment-requests`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setPaymentRequests(response.data.data);
@@ -174,7 +174,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
 
     const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
       console.log('Admin received messageDeleted for messageId:', messageId);
-  console.log('Current message IDs:', messages.map(m => m._id));
       setMessages((prev) =>
         prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
       );
@@ -223,8 +222,10 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
 
   const handleSend = useCallback(
     async (messageType: 'text' | 'image' | 'voice', content: string | File) => {
-      if (!userId || !adminId.current) return;
+      if (!userId || !adminId.current || !socket) return;
+
       const tempId = Date.now().toString();
+      const tempTimestamp = new Date().toISOString();
       const tempMessage: Message = {
         _id: tempId,
         content: messageType === 'text' ? (content as string) : 'Uploading...',
@@ -233,37 +234,68 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         status: 'sending',
         senderId: adminId.current,
         chatId: userId,
-        timestamp: new Date().toISOString(),
+        timestamp: tempTimestamp,
       };
       setMessages((prev) => [...prev, tempMessage]);
       scrollToBottom();
 
       try {
-        const response = await adminService.sendMessageToUser(userId, messageType, content);
-        const savedMessage = response.messages[response.messages.length - 1];
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg._id === tempId
-              ? {
-                  ...msg,
-                  _id: savedMessage._id.toString(),
-                  content: savedMessage.content,
-                  status: 'delivered' as const,
-                  timestamp: savedMessage.timestamp,
-                }
-              : msg
-          )
-        );
-        scrollToBottom();
+        const messageData = {
+          targetUserId: userId,
+          messageType,
+          content: messageType === 'text' ? content : await convertFileToBase64(content as File),
+          tempId,
+        };
+        console.log('Sending message via socket:', messageData);
+
+        socket.emit('sendMessage', messageData, (response: { status: string; message?: any }) => {
+          if (response.status === 'success') {
+            const savedMessage = response.message;
+            console.log('Message sent successfully:', savedMessage);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg._id === tempId
+                  ? {
+                      ...msg,
+                      _id: savedMessage._id,
+                      content: savedMessage.content,
+                      status: 'delivered' as const,
+                      timestamp: savedMessage.timestamp,
+                    }
+                  : msg
+              )
+            );
+            // Emit updateUserOrder to ensure AdminSidebar updates with the exact server timestamp
+            socket.emit('updateUserOrder', {
+              userId: userId,
+              timestamp: savedMessage.timestamp,
+            });
+            scrollToBottom();
+          } else {
+            console.error('Failed to send message via socket:', response);
+            setMessages((prev) =>
+              prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
+            );
+          }
+        });
       } catch (error) {
-        console.error('Failed to send message:', error);
+        console.error('Error sending message:', error);
         setMessages((prev) =>
           prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
         );
       }
     },
-    [userId, scrollToBottom]
+    [userId, scrollToBottom, socket]
   );
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
   const handleEditStart = (messageId: string, content: string) => {
     setEditingMessageId(messageId);
