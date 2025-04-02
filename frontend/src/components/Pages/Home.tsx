@@ -6,14 +6,13 @@ import ChatList from '../chat/ChatList';
 import ChatInput from '../chat/ChatInput';
 import chatService from '../Services/chatService';
 import ProfileModal from '../Modal/ProfileModal';
-import { motion } from 'framer-motion';
-import { DollarSign, X, Upload } from 'lucide-react';
+import { useNotification } from '../../context/NotificationContext';
 
 interface Message {
   _id: string;
   content: string;
   isSelf: boolean;
-  messageType?: 'text' | 'image' | 'voice' | 'screenshot';
+  messageType: 'text' | 'image' | 'voice'; // Removed 'screenshot'
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   duration?: number;
   timestamp?: string;
@@ -22,38 +21,18 @@ interface Message {
   isDeleted?: boolean;
 }
 
-interface PaymentDetails {
-  accountNumber: string;
-  ifscCode: string;
-  amount: string;
-  name: string;
-  upiId: string;
-}
-
 const Home = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeTab, setActiveTab] = useState<'chats' | 'files' | 'profile'>('chats');
+  const [activeTab] = useState<'chats' | 'files' | 'profile'>('chats');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [screenshotRequested, setScreenshotRequested] = useState(() => {
-    return localStorage.getItem('screenshotRequested') === 'true';
-  });
-  const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(() => {
-    const stored = localStorage.getItem('paymentDetails');
-    return stored ? JSON.parse(stored) : null;
-  });
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState<string>('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<any>(null);
+  const socketRef = useRef<SocketIOClient.Socket | null>(null);
   const navigate = useNavigate();
   const pendingMessages = useRef<Set<string>>(new Set());
   const userId = useRef<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    localStorage.setItem('screenshotRequested', screenshotRequested.toString());
-    localStorage.setItem('paymentDetails', JSON.stringify(paymentDetails));
-  }, [screenshotRequested, paymentDetails]);
+  const { setUnreadCount } :any= useNotification();
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
@@ -94,22 +73,9 @@ const Home = () => {
 
     socketRef.current.on('newMessage', handleNewMessage);
 
-    socketRef.current.on('screenshotRequested', (data: { userId: string; paymentDetails: PaymentDetails }) => {
-      console.log('Received screenshotRequested:', data);
-      if (data.userId === userId.current) {
-        setScreenshotRequested(true);
-        setPaymentDetails(data.paymentDetails);
-      } else {
-        console.log('User ID mismatch:', data.userId, '!=', userId.current);
-      }
-    });
-
-    socketRef.current.on('screenshotFulfilled', () => {
-      console.log('Screenshot fulfilled received');
-      setScreenshotRequested(false);
-      setPaymentDetails(null);
-      localStorage.removeItem('screenshotRequested');
-      localStorage.removeItem('paymentDetails');
+    socketRef.current.on('paymentRequest', () => {
+      console.log('Received paymentRequest');
+      setUnreadCount((prev: any) => prev + 1); // Explicitly typed prev as number
     });
 
     socketRef.current.on('messageEdited', (updatedMessage: { _id: string; content: string; isEdited: boolean }) => {
@@ -175,14 +141,14 @@ const Home = () => {
     return () => {
       socketRef.current?.disconnect();
     };
-  }, [navigate, handleNewMessage, scrollToBottom]);
+  }, [navigate, handleNewMessage, scrollToBottom, setUnreadCount]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
   const handleSend = useCallback(
-    async (messageType: 'text' | 'image' | 'voice' | 'screenshot', content: string | File, duration?: number) => {
+    async (messageType: 'text' | 'image' | 'voice', content: string | File, duration?: number) => {
       if (!socketRef.current || !userId.current) return;
 
       const tempId = Date.now().toString();
@@ -202,16 +168,8 @@ const Home = () => {
       scrollToBottom();
 
       try {
-        const serviceMessageType = messageType === 'screenshot' ? 'image' : messageType;
-        const response = await chatService.sendMessage(serviceMessageType, content);
+        const response = await chatService.sendMessage(messageType, content);
         const savedMessage = response.messages[response.messages.length - 1];
-
-        if (messageType === 'screenshot') {
-          socketRef.current.emit('screenshotUploaded', {
-            userId: userId.current,
-            messageId: savedMessage._id,
-          });
-        }
 
         setMessages((prev) =>
           prev.map((msg) =>
@@ -250,7 +208,7 @@ const Home = () => {
     chatService
       .editMessage(messageId, editedContent)
       .then(() => {
-        socketRef.current.emit('editMessage', { messageId, content: editedContent });
+        socketRef.current?.emit('editMessage', { messageId, content: editedContent });
         setMessages((prev) =>
           prev.map((msg) =>
             msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
@@ -266,28 +224,12 @@ const Home = () => {
     chatService
       .deleteMessage(messageId)
       .then(() => {
-        socketRef.current.emit('deleteMessage', { messageId });
+        socketRef.current?.emit('deleteMessage', { messageId });
         setMessages((prev) =>
           prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
         );
       })
       .catch((error) => console.error('Failed to delete message:', error));
-  };
-
-  const handleScreenshotUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        alert('Please select an image file.');
-        return;
-      }
-      handleSend('screenshot', file);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -315,73 +257,6 @@ const Home = () => {
             </div>
             <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2 z-50">
               <ChatInput onSend={handleSend} />
-              {screenshotRequested && paymentDetails && (
-                <motion.div
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 50 }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                  className="absolute bottom-16 left-0 right-0 mx-4 bg-gray-900 rounded-lg shadow-2xl border border-gray-700/50 max-w-md p-4 z-10 backdrop-blur-md"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <DollarSign className="w-5 h-5 text-amber-400" />
-                      <h4 className="text-lg font-semibold text-white">Payment Request</h4>
-                    </div>
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => {
-                        setScreenshotRequested(false);
-                        setPaymentDetails(null);
-                        localStorage.removeItem('screenshotRequested');
-                        localStorage.removeItem('paymentDetails');
-                      }}
-                      className="text-gray-400 hover:text-white transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </motion.button>
-                  </div>
-                  <div className="bg-gray-800/50 rounded-md p-3 space-y-2 text-sm text-gray-200">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-400">Account Number:</span>
-                      <span>{paymentDetails.accountNumber}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-400">IFSC Code:</span>
-                      <span>{paymentDetails.ifscCode}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-400">Amount:</span>
-                      <span className="text-amber-400 font-semibold">₹{paymentDetails.amount}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-400">Name:</span>
-                      <span>{paymentDetails.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-400">UPI ID:</span>
-                      <span>{paymentDetails.upiId}</span>
-                    </div>
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleScreenshotUpload}
-                    className="mt-4 w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2.5 rounded-lg font-medium text-sm shadow-md hover:from-blue-700 hover:to-blue-800 transition-all duration-300 flex items-center justify-center space-x-2"
-                  >
-                    <Upload className="w-4 h-4" />
-                    <span>Upload Payment Proof</span>
-                  </motion.button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </motion.div>
-              )}
             </div>
           </>
         )}
@@ -390,7 +265,7 @@ const Home = () => {
         isOpen={isProfileModalOpen}
         onClose={() => {
           setIsProfileModalOpen(false);
-          setActiveTab('chats');
+          // Removed setActiveTab since it's not defined
         }}
       />
     </div>

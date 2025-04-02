@@ -3,15 +3,16 @@ import adminService from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DollarSign, X, Check, User, ArrowLeft } from 'lucide-react';
+import { DollarSign, X, Check, User, ArrowLeft, Image } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 import chatService from '../Services/chatService';
+import axios from 'axios';
 
 interface Message {
   _id: string;
   content: string;
   isSelf: boolean;
-  messageType?: 'text' | 'image' | 'voice' | 'screenshot';
+  messageType?: 'text' | 'image' | 'voice';
   status: 'sending' | 'sent' | 'delivered' | 'failed';
   senderId?: string;
   chatId?: string;
@@ -28,6 +29,15 @@ interface PaymentDetails {
   upiId: string;
 }
 
+interface PaymentRequest {
+  _id: string;
+  userId: { _id: string; username: string };
+  paymentDetails: PaymentDetails;
+  status: 'pending' | 'uploaded';
+  screenshotUrl?: string;
+  createdAt: string;
+}
+
 interface AdminChatWindowProps {
   userId: string | null;
   username?: string | null;
@@ -41,7 +51,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   const [showToast, setShowToast] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showUserDetails, setShowUserDetails] = useState(false);
-  const [screenshotStatus, setScreenshotStatus] = useState<'none' | 'requested' | 'fulfilled'>('none');
+  const [showPaymentRequests, setShowPaymentRequests] = useState(false);
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState<string>('');
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetails>({
@@ -72,6 +83,18 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     }
   }, [userId, socket]);
 
+  const fetchPaymentRequests = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response :any= await axios.get(`${import.meta.env.VITE_API_URL}/admin/payment-requests`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPaymentRequests(response.data.data);
+    } catch (error) {
+      console.error('Failed to fetch payment requests:', error);
+    }
+  }, []);
+
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token || !userId) {
@@ -87,10 +110,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         const chat = await adminService.getUserChatHistory(userId);
         const formattedMessages: Message[] = chat.messages
           .map((msg: any) => {
-            if (!msg || !msg._id || !msg.sender_id) {
-              console.warn('Invalid message format:', msg);
-              return null;
-            }
+            if (!msg || !msg._id || !msg.sender_id) return null;
             return {
               _id: msg._id.toString(),
               content: msg.content || '',
@@ -108,13 +128,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           .sort((a: any, b: any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
         setMessages(formattedMessages);
-        const hasRecentScreenshot = formattedMessages.some(
-          (msg) =>
-            msg.messageType === 'screenshot' &&
-            !msg.isSelf &&
-            new Date(msg.timestamp || '').getTime() > Date.now() - 24 * 60 * 60 * 1000
-        );
-        setScreenshotStatus(hasRecentScreenshot ? 'fulfilled' : 'none');
         setTimeout(() => scrollToBottom(), 0);
         markMessagesAsRead();
       } catch (error) {
@@ -124,6 +137,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
 
     fetchChatHistory();
+    fetchPaymentRequests();
 
     const handleNewMessage = (message: Message) => {
       if (message.chatId === userId || message.senderId === userId) {
@@ -132,21 +146,21 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           ...prev,
           { ...message, status: 'delivered' as const, isSelf: isAdminMessage },
         ]);
-        if (message.messageType === 'screenshot' && !isAdminMessage) {
-          setScreenshotStatus('fulfilled');
-          setShowToast(true);
-          setTimeout(() => setShowToast(false), 3000);
-        }
         setTimeout(() => scrollToBottom(), 0);
         if (!isAdminMessage) markMessagesAsRead();
       }
     };
 
-    const handleScreenshotFulfilled = ({ userId: fulfilledUserId }: { userId: string }) => {
-      if (fulfilledUserId === userId) {
-        setScreenshotStatus('fulfilled');
+    const handleScreenshotUploaded = ({ paymentRequestId, userId: uploadedUserId, screenshotUrl }: { paymentRequestId: string; userId: string; screenshotUrl: string }) => {
+      if (uploadedUserId === userId) {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
+        setPaymentRequests((prev) =>
+          prev.map((pr) =>
+            pr._id === paymentRequestId ? { ...pr, status: 'uploaded', screenshotUrl } : pr
+          )
+        );
+        fetchChatHistory(); // Refresh chat to include any related messages
       }
     };
 
@@ -165,37 +179,44 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
 
     socket.on('newMessage', handleNewMessage);
-    socket.on('screenshotFulfilled', handleScreenshotFulfilled);
+    socket.on('screenshotUploaded', handleScreenshotUploaded);
     socket.on('messageEdited', handleMessageEdited);
     socket.on('messageDeleted', handleMessageDeleted);
 
     return () => {
       socket.off('newMessage', handleNewMessage);
-      socket.off('screenshotFulfilled', handleScreenshotFulfilled);
+      socket.off('screenshotUploaded', handleScreenshotUploaded);
       socket.off('messageEdited', handleMessageEdited);
       socket.off('messageDeleted', handleMessageDeleted);
     };
-  }, [userId, socket, scrollToBottom, markMessagesAsRead]);
+  }, [userId, socket, scrollToBottom, markMessagesAsRead, fetchPaymentRequests]);
 
-  const handleRequestScreenshot = () => {
-    if (!userId || !socket) return;
-    const paymentRequest = {
-      userId,
-      paymentDetails: {
-        accountNumber: paymentDetails.accountNumber,
-        ifscCode: paymentDetails.ifscCode.toUpperCase(),
-        amount: paymentDetails.amount,
-        name: paymentDetails.name,
-        upiId: paymentDetails.upiId,
-      },
-    };
-    socket.emit('requestScreenshot', paymentRequest);
-    setScreenshotStatus('requested');
-    setShowToast(true);
-    setShowRequestModal(false);
-    setTimeout(() => setShowToast(false), 3000);
-    // Reset payment details after sending
-    setPaymentDetails({ accountNumber: '', ifscCode: '', amount: '', name: '', upiId: '' });
+  const handleRequestScreenshot = async () => {
+    if (!userId) return;
+    try {
+      const token = localStorage.getItem('adminToken');
+      await axios.post(
+        `${import.meta.env.VITE_API_URL}/admin/payment-request`,
+        {
+          userId,
+          paymentDetails: {
+            accountNumber: paymentDetails.accountNumber,
+            ifscCode: paymentDetails.ifscCode.toUpperCase(),
+            amount: paymentDetails.amount,
+            name: paymentDetails.name,
+            upiId: paymentDetails.upiId,
+          },
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setShowToast(true);
+      setShowRequestModal(false);
+      setTimeout(() => setShowToast(false), 3000);
+      setPaymentDetails({ accountNumber: '', ifscCode: '', amount: '', name: '', upiId: '' });
+      fetchPaymentRequests(); // Refresh payment requests
+    } catch (error) {
+      console.error('Failed to request screenshot:', error);
+    }
   };
 
   const handleSend = useCallback(
@@ -264,7 +285,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const handleDelete = (messageId: string) => {
-   chatService
+    chatService
       .deleteMessageAdmin(messageId)
       .then(() => {
         socket.emit('deleteMessage', { messageId });
@@ -326,16 +347,21 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowPaymentRequests(true)}
+                  className="p-2 rounded-xl bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 transition-all duration-300 flex items-center space-x-2"
+                  title="View Payment Requests"
+                >
+                  <Image className="w-4 h-4" />
+                  <span className="text-sm font-medium hidden sm:inline">Payments</span>
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setShowRequestModal(true)}
-                  className={`bg-gradient-to-r from-amber-600 to-amber-700 text-white px-2 sm:px-4 py-2 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/30 ${
-                    screenshotStatus === 'fulfilled' ? 'opacity-60 cursor-not-allowed' : ''
-                  }`}
-                  disabled={screenshotStatus === 'fulfilled' || !userId || !socket}
+                  className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-2 sm:px-4 py-2 rounded-xl shadow-md hover:from-amber-700 hover:to-amber-800 transition-all duration-300 flex items-center space-x-2 text-sm font-semibold border border-amber-500/30"
                 >
                   <DollarSign className="w-4 h-4" />
-                  <span className="hidden sm:inline">
-                    {screenshotStatus === 'fulfilled' ? 'Screenshot Received' : 'Request Payment Screenshot'}
-                  </span>
+                  <span className="hidden sm:inline">Request Payment Screenshot</span>
                 </motion.button>
               </div>
             </div>
@@ -355,6 +381,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             <ChatInput onSend={handleSend} />
           </div>
 
+          {/* Payment Request Modal */}
           <AnimatePresence>
             {showRequestModal && (
               <motion.div
@@ -443,6 +470,93 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             )}
           </AnimatePresence>
 
+          {/* Payment Requests View Modal */}
+          <AnimatePresence>
+            {showPaymentRequests && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-gradient-to-b from-gray-900 to-black p-6 rounded-2xl shadow-xl border border-white/10 w-11/12 max-w-2xl mx-4 max-h-[85vh] overflow-y-auto"
+                >
+                  <div className="flex justify-between items-center mb-6">
+                    <h4 className="text-xl font-semibold text-white">Payment Requests for {username}</h4>
+                    <button
+                      onClick={() => setShowPaymentRequests(false)}
+                      className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    {paymentRequests
+                      .filter((pr) => pr.userId._id === userId)
+                      .map((pr) => (
+                        <motion.div
+                          key={pr._id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 bg-gray-800 rounded-lg border border-white/10"
+                        >
+                          <div className="space-y-2 text-sm text-gray-200">
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-400">Account Number:</span>
+                              <span>{pr.paymentDetails.accountNumber}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-400">IFSC Code:</span>
+                              <span>{pr.paymentDetails.ifscCode}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-400">Amount:</span>
+                              <span className="text-amber-400 font-semibold">₹{pr.paymentDetails.amount}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-400">Name:</span>
+                              <span>{pr.paymentDetails.name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-400">UPI ID:</span>
+                              <span>{pr.paymentDetails.upiId}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-400">Status:</span>
+                              <span className={pr.status === 'uploaded' ? 'text-green-400' : 'text-yellow-400'}>
+                                {pr.status.charAt(0).toUpperCase() + pr.status.slice(1)}
+                              </span>
+                            </div>
+                            {pr.screenshotUrl && (
+                              <div className="mt-2">
+                                <a
+                                  href={pr.screenshotUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-amber-400 hover:underline flex items-center space-x-2"
+                                >
+                                  <Image className="w-4 h-4" />
+                                  <span>View Screenshot</span>
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    {paymentRequests.filter((pr) => pr.userId._id === userId).length === 0 && (
+                      <p className="text-white/70 text-center">No payment requests found for this user.</p>
+                    )}
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Toast Notification */}
           <AnimatePresence>
             {showToast && (
               <motion.div
@@ -452,11 +566,12 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                 className="fixed bottom-4 right-4 md:bottom-6 md:right-6 lg:bottom-8 lg:right-8 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl shadow-md text-sm font-medium flex items-center space-x-2"
               >
                 <DollarSign className="w-4 h-4" />
-                <span>{screenshotStatus === 'fulfilled' ? 'Screenshot received' : 'Screenshot request sent'}</span>
+                <span>Screenshot request sent or received</span>
               </motion.div>
             )}
           </AnimatePresence>
 
+          {/* User Details Modal */}
           {showUserDetails && (
             <motion.div
               initial={{ opacity: 0 }}

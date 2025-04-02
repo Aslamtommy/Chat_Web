@@ -6,7 +6,7 @@ import { adminRoleMiddleware } from '../middleware/role';
 import { validateUserId } from '../middleware/validateUserId';
 import uploadMiddleware from '../middleware/upload';
 import { RequestHandler } from 'express';
-
+import PaymentController from '../controllers/PaymentController';
 const router = express.Router();
 
 router.post('/auth/login', AdminAuthController.adminLogin);
@@ -18,5 +18,6 @@ router.get('/chats/user/:userId', authMiddleware as RequestHandler, adminRoleMid
 router.post('/chats/user/:userId/message', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, validateUserId as RequestHandler, uploadMiddleware as RequestHandler, AdminChatController.sendMessageToUserChat);
 router.get('/chats/unread-counts', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, AdminChatController.getUnreadCounts);
 router.post('/chats/user/:userId/mark-read', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, validateUserId as RequestHandler, AdminChatController.markMessagesAsRead);
-
+router.post('/payment-request', authMiddleware as RequestHandler, PaymentController.createPaymentRequest);
+router.get('/payment-requests', authMiddleware as RequestHandler, PaymentController.getAdminPaymentRequests);
 export default router;

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, MessageSquareText, User } from 'lucide-react';
+import { LogOut, MessageSquareText, User, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNotification } from '../../context/NotificationContext';
 
 interface ChatHeaderProps {
   onProfileClick: () => void; // Prop to trigger profile modal
@@ -8,6 +9,7 @@ interface ChatHeaderProps {
 
 const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
   const navigate = useNavigate();
+  const { unreadCount } = useNotification();
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -48,8 +50,27 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
           </h2>
         </div>
 
-        {/* Actions: Profile and Logout */}
+        {/* Actions: Notification, Profile, and Logout */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Notification Button */}
+          <motion.button
+            variants={buttonVariants}
+            initial="initial"
+            whileHover="hover"
+            whileTap="tap"
+            onClick={() => navigate('/notifications')}
+            className="relative flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
+            style={{ transformStyle: 'preserve-3d' }} // Enable 3D transforms
+          >
+            <Bell className="w-5 h-5 group-hover:stroke-amber-500" />
+            {unreadCount > 0 && (
+              <span className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs">
+                {unreadCount}
+              </span>
+            )}
+            <span className="text-sm font-medium hidden sm:inline">Notifications</span>
+          </motion.button>
+
           {/* Profile Button */}
           <motion.button
             variants={buttonVariants}

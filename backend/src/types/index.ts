@@ -30,3 +30,20 @@ export interface IChatThread extends Document {
   messages: IMessage[];
   last_read_by_admin?: Date;
 }
+
+export interface IPaymentRequest {
+  _id: string;
+  userId:any
+  adminId: any
+  paymentDetails: {
+    accountNumber: string;
+    ifscCode: string;
+    amount: string;
+    name: string;
+    upiId: string;
+  };
+  status: 'pending' | 'uploaded';
+  screenshotUrl?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

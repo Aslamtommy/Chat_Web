@@ -8,10 +8,12 @@ import AdminLoginPage from './components/Pages/AdminLoginPage';
 import AdminDashboard from './components/Pages/AdminDashboard';
 import FilesPage from './components/Pages/FilesPage';
 import { Toaster } from 'react-hot-toast';
-
+import { NotificationProvider } from './context/NotificationContext';
+import NotificationsPage from './components/Pages/NotificationsPage';
 const App = () => {
   return (
     <>
+    <NotificationProvider>
       <Toaster />
       <Router>
         <Routes>
@@ -33,6 +35,14 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+          <Route
+  path="/notifications"
+  element={
+    <ProtectedRoute>
+      <NotificationsPage />
+    </ProtectedRoute>
+  }
+/>
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route
             path="/admin/dashboard"
@@ -45,6 +55,7 @@ const App = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
+      </NotificationProvider>
     </>
   );
 };
