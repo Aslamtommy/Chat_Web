@@ -84,28 +84,7 @@ const adminService = {
     if (!response.data.success) throw new Error(response.data.error || 'Failed to mark messages as read');
     return response.data.data;
   },
-  editMessage: async (messageId: string, content: string) => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) throw new Error('No admin token found. Please log in.');
-    const response: any = await axios.put(
-      `http://Localhost:5000/chat/message/${messageId}`,
-      { content },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!response.data.success) throw new Error(response.data.error || 'Failed to edit message');
-    return response.data.data;
-  },
   
-  deleteMessage: async (messageId: string) => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) throw new Error('No admin token found. Please log in.');
-    const response: any = await axios.delete(`http://Localhost:5000/chat/message/${messageId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.data.success) throw new Error(response.data.error || 'Failed to delete message');
-    return response.data.data;
-  },
-
   
 };
 

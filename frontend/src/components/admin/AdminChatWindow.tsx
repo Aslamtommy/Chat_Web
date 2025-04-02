@@ -5,6 +5,7 @@ import ChatInput from '../../components/chat/ChatInput';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DollarSign, X, Check, User, ArrowLeft } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
+import chatService from '../Services/chatService';
 
 interface Message {
   _id: string;
@@ -247,8 +248,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const handleEditSave = (messageId: string) => {
-    adminService
-      .editMessage(messageId, editedContent)
+    chatService
+      .editMessageAdmin(messageId, editedContent)
       .then(() => {
         socket.emit('editMessage', { messageId, content: editedContent });
         setMessages((prev) =>
@@ -263,8 +264,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const handleDelete = (messageId: string) => {
-    adminService
-      .deleteMessage(messageId)
+   chatService
+      .deleteMessageAdmin(messageId)
       .then(() => {
         socket.emit('deleteMessage', { messageId });
         setMessages((prev) =>

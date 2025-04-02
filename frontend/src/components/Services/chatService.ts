@@ -56,6 +56,29 @@ const chatService = {
     if (!response.data.success) throw new Error(response.data.error || 'Failed to delete message');
     return response.data.data;
   },
+
+  editMessageAdmin: async (messageId: string, content: string) => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) throw new Error('No admin token found. Please log in.');
+    const response: any = await axios.put(
+      `${API_URL}/message/${messageId}`,
+      { content },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to edit message');
+    return response.data.data;
+  },
+  
+  deleteMessageAdmin: async (messageId: string) => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) throw new Error('No admin token found. Please log in.');
+    const response: any = await axios.delete(`${API_URL}/message/${messageId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to delete message');
+    return response.data.data;
+  },
+
 };
 
 export default chatService;
