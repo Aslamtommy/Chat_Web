@@ -110,7 +110,12 @@ io.on('connection', (socket: Socket) => {
       console.error('Error fetching chat history:', error);
     }
   });
-
+  socket.on('syncUnreadCounts', () => {
+    if (isAdmin) {
+      syncUnreadCounts(socket); // Respond to explicit client request
+      console.log('Admin requested syncUnreadCounts');
+    }
+  });
   socket.on('sendMessage', async ({ targetUserId, messageType, content, tempId }, ack) => {
     try {
       const senderId = socket.data.user.id;

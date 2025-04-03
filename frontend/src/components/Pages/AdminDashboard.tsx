@@ -28,7 +28,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
-      navigate('/admin/login');
+      navigate('/');
       return;
     }
 
@@ -44,6 +44,10 @@ const AdminDashboard = () => {
         setIsSocketConnected(true);
         console.log('Admin socket connected');
         socketRef.current.emit('syncUnreadCounts');
+      });
+      socketRef.current.on('reconnect', () => {
+        console.log('Admin socket reconnected');
+        socketRef.current.emit('syncUnreadCounts'); // Emit on reconnect
       });
 
       socketRef.current.on('connect_error', (error: any) => {

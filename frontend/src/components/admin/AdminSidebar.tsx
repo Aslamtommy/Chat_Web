@@ -124,7 +124,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     socket.on('updateUserOrder', handleUpdateUserOrder);
 
     if (socket.connected) {
-      socketConnected.current = true;
+      socket.emit('syncUnreadCounts');
     }
 
     return () => {
