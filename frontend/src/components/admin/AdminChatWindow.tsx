@@ -67,7 +67,10 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
+      console.log('scrollToBottom called, scrollHeight:', chatContainerRef.current.scrollHeight);
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    } else {
+      console.warn('chatContainerRef.current is null');
     }
   }, []);
 
@@ -125,10 +128,12 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             };
           })
           .filter((msg: any): msg is Message => msg !== null)
-          .sort((a: any, b: any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
+          // Sort in descending order (latest first)
+          .sort((a: any, b: any) => new Date(b.timestamp || '').getTime() - new Date(a.timestamp || '').getTime());
 
         setMessages(formattedMessages);
-        setTimeout(() => scrollToBottom(), 0);
+        // Scroll after messages are set
+        setTimeout(() => scrollToBottom(), 100); // Increased delay to ensure DOM updates
         markMessagesAsRead();
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
@@ -146,7 +151,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           ...prev,
           { ...message, status: 'delivered' as const, isSelf: isAdminMessage },
         ]);
-        setTimeout(() => scrollToBottom(), 0);
+        // Scroll after new message
+        setTimeout(() => scrollToBottom(), 100);
         if (!isAdminMessage) markMessagesAsRead();
       }
     };
@@ -160,7 +166,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             pr._id === paymentRequestId ? { ...pr, status: 'uploaded', screenshotUrl } : pr
           )
         );
-        fetchChatHistory(); // Refresh chat to include any related messages
+        fetchChatHistory();
       }
     };
 
@@ -190,7 +196,12 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       socket.off('messageEdited', handleMessageEdited);
       socket.off('messageDeleted', handleMessageDeleted);
     };
-  }, [userId, socket, scrollToBottom, markMessagesAsRead, fetchPaymentRequests]);
+  }, [userId, socket, markMessagesAsRead, fetchPaymentRequests]);
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    setTimeout(() => scrollToBottom(), 100); // Delay to ensure DOM updates
+  }, [messages, scrollToBottom]);
 
   const handleRequestScreenshot = async () => {
     if (!userId) return;
@@ -214,7 +225,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       setShowRequestModal(false);
       setTimeout(() => setShowToast(false), 3000);
       setPaymentDetails({ accountNumber: '', ifscCode: '', amount: '', name: '', upiId: '' });
-      fetchPaymentRequests(); // Refresh payment requests
+      fetchPaymentRequests();
     } catch (error) {
       console.error('Failed to request screenshot:', error);
     }
@@ -237,25 +248,26 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         timestamp: tempTimestamp,
       };
       setMessages((prev) => [...prev, tempMessage]);
-      scrollToBottom();
+      setTimeout(() => scrollToBottom(), 100); // Delay to ensure DOM updates
 
       try {
-
         let messageContent: string | ArrayBuffer;
         if (messageType === 'text') {
           messageContent = content as string;
         } else {
-          // Use ArrayBuffer instead of base64
           messageContent = await (content as File).arrayBuffer();
         }
 
         const messageData = {
           targetUserId: userId,
           messageType,
-          content: messageType === 'text' ? content :messageContent,
+          content: messageContent,
           tempId,
         };
-        console.log('Sending message via socket:', messageData);
+        console.log('Sending message via socket:', {
+          ...messageData,
+          content: messageType === 'text' ? messageContent : '[ArrayBuffer]',
+        });
 
         socket.emit('sendMessage', messageData, (response: { status: string; message?: any }) => {
           if (response.status === 'success') {
@@ -274,12 +286,11 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                   : msg
               )
             );
-            // Emit updateUserOrder to ensure AdminSidebar updates with the exact server timestamp
             socket.emit('updateUserOrder', {
               userId: userId,
               timestamp: savedMessage.timestamp,
             });
-            scrollToBottom();
+            setTimeout(() => scrollToBottom(), 100); // Delay to ensure DOM updates
           } else {
             console.error('Failed to send message via socket:', response);
             setMessages((prev) =>
@@ -294,10 +305,9 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         );
       }
     },
-    [userId, scrollToBottom, socket]
+    [userId, socket] // Removed scrollToBottom from dependencies
   );
 
- 
   const handleEditStart = (messageId: string, content: string) => {
     setEditingMessageId(messageId);
     setEditedContent(content);
@@ -402,9 +412,12 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               </div>
             </div>
           </div>
-  
+
           {/* Scrollable Chat List */}
-          <div className="flex-1 overflow-y-auto pt-14 pb-20 px-2">
+          <div
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto pt-14 pb-20 px-2"
+          >
             <ChatList
               messages={messages}
               editingMessageId={editingMessageId}
@@ -414,15 +427,15 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               onEditSave={handleEditSave}
               onEditCancel={() => setEditingMessageId(null)}
               onDelete={handleDelete}
-              ref={chatContainerRef}
+              // Removed ref prop here; it's now on the div
             />
           </div>
-  
+
           {/* Fixed Input */}
           <div className="fixed bottom-12 left-0 right-0 z-10 bg-black/20 backdrop-blur-sm border-t border-white/10 p-2">
             <ChatInput onSend={handleSend} />
           </div>
-  
+
           {/* Payment Request Modal */}
           <AnimatePresence>
             {showRequestModal && (
@@ -473,7 +486,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                       value={paymentDetails.name}
                       onChange={handleInputChange}
                       placeholder="Account Holder Name"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-White border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
                     />
                     <input
                       type="text"
@@ -511,7 +524,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               </motion.div>
             )}
           </AnimatePresence>
-  
+
           {/* Payment Requests View Modal */}
           <AnimatePresence>
             {showPaymentRequests && (
@@ -597,7 +610,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               </motion.div>
             )}
           </AnimatePresence>
-  
+
           {/* Toast Notification */}
           <AnimatePresence>
             {showToast && (
@@ -612,7 +625,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               </motion.div>
             )}
           </AnimatePresence>
-  
+
           {/* User Details Modal */}
           {showUserDetails && (
             <motion.div
