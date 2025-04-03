@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import ChatService from '../services/ChatService';
 import StorageService from '../services/StorageService';
-import { io } from '../server';
+import { io } from '../server'; // Ensure io is exported from your server file (e.g., index.ts)
 import ChatRepository from '../repositories/ChatRepository';
 
 class UserChatController {
@@ -33,13 +33,15 @@ class UserChatController {
         content = await StorageService.uploadFile(file, messageType);
       }
 
+      console.log(`[sendMessageToMyChat] Saving message for user: ${userId}, content: ${content}`);
       const updatedChat = await ChatService.saveMessage(userId, userId, messageType, content);
-
-      // Emit real-time update via Socket.io
       const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
       if (!newMessage || !newMessage._id) {
         throw new Error('Message not saved properly');
       }
+      console.log(`[sendMessageToMyChat] Message saved, ID: ${newMessage._id}`);
+
+      // Emit real-time update via Socket.IO
       const messagePayload = {
         _id: newMessage._id.toString(),
         chatId: updatedChat._id.toString(),
@@ -53,6 +55,7 @@ class UserChatController {
       };
 
       io.to('admin-room').emit('newMessage', messagePayload);
+      console.log(`[sendMessageToMyChat] Emitted newMessage for user: ${userId}`);
 
       // Update unread counts
       const unreadCount = await ChatRepository.getUnreadCount(userId);
@@ -60,9 +63,18 @@ class UserChatController {
         userId,
         unreadCount,
       });
+      console.log(`[sendMessageToMyChat] Emitted updateUnreadCount for user: ${userId}, count: ${unreadCount}`);
+
+      // Emit updateUserOrder for real-time sorting
+      io.to('admin-room').emit('updateUserOrder', {
+        userId,
+        timestamp: newMessage.timestamp,
+      });
+      console.log(`[sendMessageToMyChat] Emitted updateUserOrder for user: ${userId}, timestamp: ${newMessage.timestamp}`);
 
       res.json({ success: true, data: updatedChat });
     } catch (error) {
+      console.error(`[sendMessageToMyChat] Error: ${(error as Error).message}`);
       res.status(500).json({ success: false, error: (error as Error).message });
     }
   }

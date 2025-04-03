@@ -4,7 +4,6 @@ import io from 'socket.io-client';
 import ChatHeader from '../chat/ChatHeader';
 import ChatList from '../chat/ChatList';
 import ChatInput from '../chat/ChatInput';
-import chatService from '../Services/chatService';
 import ProfileModal from '../Modal/ProfileModal';
 import { useNotification } from '../../context/NotificationContext';
 
@@ -41,15 +40,22 @@ const Home = () => {
   }, []);
 
   const handleNewMessage = useCallback((message: Message) => {
-    if (message.senderId === userId.current) return;
-
     setMessages((prev) => {
       if (prev.some((m) => m._id === message._id)) return prev;
-      const newMessage = { ...message, isSelf: false, status: 'delivered' as const };
-      return [...prev, newMessage];
+      return [...prev, { ...message, isSelf: message.senderId === userId.current }];
     });
     scrollToBottom();
   }, [scrollToBottom]);
+
+  const handleMessageDelivered = useCallback((message: Message) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg._id === message._id
+          ? { ...message, status: 'delivered', isSelf: message.senderId === userId.current }
+          : msg
+      )
+    );
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -69,9 +75,30 @@ const Home = () => {
       const decoded = jwtDecode<{ id: string }>(token);
       userId.current = decoded.id;
       console.log('Socket connected, userId:', userId.current);
+      socketRef.current?.emit('getChatHistory');
+    });
+
+    socketRef.current.on('chatHistory', (chat: { messages: any[] }) => {
+      const formattedMessages: Message[] = chat.messages
+        .map((msg: any) => ({
+          _id: msg._id.toString(),
+          content: msg.content || '',
+          isSelf: msg.sender_id.toString() === userId.current,
+          messageType: msg.message_type || 'text',
+          status: 'delivered' as const,
+          senderId: msg.sender_id.toString(),
+          timestamp: msg.timestamp || new Date().toISOString(),
+          isEdited: msg.isEdited || false,
+          isDeleted: msg.isDeleted || false,
+        }))
+        .sort((a, b) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
+
+      setMessages(formattedMessages);
+      setTimeout(scrollToBottom, 0);
     });
 
     socketRef.current.on('newMessage', handleNewMessage);
+    socketRef.current.on('messageDelivered', handleMessageDelivered);
 
     socketRef.current.on('paymentRequest', () => {
       console.log('Received paymentRequest');
@@ -96,52 +123,10 @@ const Home = () => {
       console.error('Socket connection error:', error);
     });
 
-    const fetchChatHistory = async () => {
-      try {
-        const chat = await chatService.getChatHistory();
-        if (!chat || !chat.messages) {
-          console.log('No chat history found');
-          setMessages([]);
-          return;
-        }
-
-        const formattedMessages: Message[] = chat.messages
-          .map((msg: any) => {
-            if (!msg || !msg._id || !msg.sender_id) {
-              console.warn('Invalid message format:', msg);
-              return null;
-            }
-            return {
-              _id: msg._id.toString(),
-              content: msg.content || '',
-              isSelf: msg.sender_id.toString() === userId.current,
-              messageType: msg.message_type || 'text',
-              status: 'delivered' as const,
-              senderId: msg.sender_id.toString(),
-              timestamp: msg.timestamp || new Date().toISOString(),
-              isEdited: msg.isEdited || false,
-              isDeleted: msg.isDeleted || false,
-            };
-          })
-          .filter((msg: any): msg is Message => msg !== null)
-          .sort((a: any, b: any) =>
-            new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime()
-          );
-
-        setMessages(formattedMessages);
-        setTimeout(scrollToBottom, 0);
-      } catch (error) {
-        console.error('Failed to fetch chat history:', error);
-        setMessages([]);
-      }
-    };
-
-    fetchChatHistory();
-
     return () => {
       socketRef.current?.disconnect();
     };
-  }, [navigate, handleNewMessage, scrollToBottom, setUnreadCount]);
+  }, [navigate, handleNewMessage, handleMessageDelivered, scrollToBottom, setUnreadCount]);
 
   useEffect(() => {
     scrollToBottom();
@@ -168,49 +153,36 @@ const Home = () => {
       setMessages((prev) => [...prev, tempMessage]);
       scrollToBottom();
 
-      try {
-        const response = await chatService.sendMessage(messageType, content);
-        const savedMessage = response.messages[response.messages.length - 1];
-
-        const updatedMessage: Message = {
-          _id: savedMessage._id.toString(),
-          content: savedMessage.content,
-          isSelf: true,
-          messageType: messageType,
-          status: 'delivered' as const,
-          senderId: userId.current,
-          duration: savedMessage.duration || duration,
-          timestamp: savedMessage.timestamp,
-        };
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg._id === tempId ? updatedMessage : msg
-          )
-        );
-        pendingMessages.current.delete(tempId);
-
-        // Emit sendMessage event via Socket.IO to notify the admin in real-time
-        socketRef.current.emit('sendMessage', {
-          targetUserId: 'admin', // Assuming messages are sent to admin
-          messageType,
-          content: savedMessage.content,
-          tempId: savedMessage._id, // Use the real ID here
-        }, (ack: { status: string; message?: any }) => {
-          if (ack.status === 'success') {
-            console.log('Message acknowledged by server:', ack.message);
-          } else {
-            console.error('Failed to acknowledge message:', ack);
-          }
-        });
-
-      } catch (error) {
-        console.error('Failed to send message:', error);
-        setMessages((prev) =>
-          prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
-        );
-        pendingMessages.current.delete(tempId);
+      let finalContent: string | ArrayBuffer = content as string;
+      if (messageType === 'image' || messageType === 'voice') {
+        finalContent = await (content as File).arrayBuffer();
       }
+
+      socketRef.current.emit(
+        'sendMessage',
+        {
+          targetUserId: 'admin',
+          messageType,
+          content: finalContent,
+          tempId,
+        },
+        (ack: { status: string; message?: Message; error?: string }) => {
+          if (ack.status === 'success' && ack.message) {
+            setMessages((prev:any) =>
+              prev .map((msg:any) =>
+                msg._id === tempId ? { ...ack.message, isSelf: true, status: 'delivered' } : msg
+              )
+            );
+            pendingMessages.current.delete(tempId);
+          } else {
+            console.error('Failed to send message:', ack.error);
+            setMessages((prev) =>
+              prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
+            );
+            pendingMessages.current.delete(tempId);
+          }
+        }
+      );
     },
     [scrollToBottom]
   );
@@ -221,31 +193,29 @@ const Home = () => {
   };
 
   const handleEditSave = (messageId: string) => {
-    chatService
-      .editMessage(messageId, editedContent)
-      .then(() => {
-        socketRef.current?.emit('editMessage', { messageId, content: editedContent });
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
-          )
-        );
-        setEditingMessageId(null);
-        setEditedContent('');
-      })
-      .catch((error) => console.error('Failed to edit message:', error));
+    socketRef.current?.emit(
+      'editMessage',
+      { messageId, content: editedContent },
+      (ack: { status: string }) => {
+        if (ack.status === 'success') {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
+            )
+          );
+          setEditingMessageId(null);
+          setEditedContent('');
+        }
+      }
+    );
   };
 
   const handleDelete = (messageId: string) => {
-    console.log('handleDelete called in Home for messageId:', messageId);
     socketRef.current?.emit('deleteMessage', { messageId }, (response: { status: string }) => {
       if (response.status === 'success') {
-        console.log('Message deleted successfully via socket, updating state:', messageId);
         setMessages((prev) =>
           prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
         );
-      } else {
-        console.error('Socket deletion failed:', response);
       }
     });
   };
@@ -281,9 +251,7 @@ const Home = () => {
       </div>
       <ProfileModal
         isOpen={isProfileModalOpen}
-        onClose={() => {
-          setIsProfileModalOpen(false);
-        }}
+        onClose={() => setIsProfileModalOpen(false)}
       />
     </div>
   );

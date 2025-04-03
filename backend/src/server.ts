@@ -9,10 +9,11 @@ import chatRoutes from './routes/chat';
 import uploadRoutes from './routes/upload';
 import adminRoutes from './routes/adminRoutes';
 import ChatService from './services/ChatService';
+import StorageService from './services/StorageService';
 import dotenv from 'dotenv';
 import ChatRepository from './repositories/ChatRepository';
 import ChatThread from './models/ChatThread';
-import { IChatThread, IMessage } from './types'; // Import your types
+import { IChatThread, IMessage } from './types';
 
 declare module 'express' {
   export interface Request {
@@ -78,14 +79,12 @@ const syncUnreadCounts = async (socket: Socket) => {
   try {
     const allUsers = await mongoose.model('User').find({ role: 'user' });
     const unreadCounts: { [key: string]: number } = {};
-    
     for (const user of allUsers) {
       const uid = user._id.toString();
       const count = await ChatRepository.getUnreadCount(uid);
       unreadCounts[uid] = count;
     }
-    
-    console.log('Sending unread counts to admin:', unreadCounts);
+    console.log('Syncing unread counts to admin on connect:', unreadCounts);
     socket.emit('initialUnreadCounts', unreadCounts);
   } catch (error) {
     console.error('Error syncing unread counts:', error);
@@ -95,53 +94,72 @@ const syncUnreadCounts = async (socket: Socket) => {
 io.on('connection', (socket: Socket) => {
   const userId = socket.data.user.id;
   const isAdmin = socket.data.user.role === 'admin';
-  
+
   console.log(`User connected: ${userId} (${socket.data.user.role})`);
-  
   socket.join(userId);
   if (isAdmin) {
     socket.join('admin-room');
-    console.log(`Admin ${userId} joined admin-room`);
-    syncUnreadCounts(socket); // Sync immediately on connection
+    syncUnreadCounts(socket); // Ensure this runs on every admin connect
   }
 
-  socket.on('syncUnreadCounts', () => {
-    if (isAdmin) {
-      console.log(`Admin ${userId} requested unread count sync`);
-      syncUnreadCounts(socket);
+  socket.on('getChatHistory', async () => {
+    try {
+      const chat = await ChatService.getOrCreateChat(userId);
+      socket.emit('chatHistory', chat);
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
     }
   });
 
-  // socket.on('requestScreenshot', ({ userId: targetUserId, paymentDetails }) => {
-  //   if (!isAdmin) return;
-  //   console.log(`Admin requested screenshot from ${targetUserId} with details:`, paymentDetails);
-  //   io.to(targetUserId).emit('screenshotRequested', { userId: targetUserId, paymentDetails });
-  // });
-
-  socket.on('screenshotUploaded', ({ userId, messageId }) => {
-    io.to(userId).emit('screenshotFulfilled');
-    io.to('admin-room').emit('screenshotFulfilled', { userId, messageId });
-  });
-
-  socket.on('markMessagesAsRead', async ({ chatId }) => {
+  socket.on('sendMessage', async ({ targetUserId, messageType, content, tempId }, ack) => {
     try {
-      if (!isAdmin) return;
-      
-      await ChatRepository.markMessagesAsRead(chatId, userId);
-      const unreadCount = await ChatRepository.getUnreadCount(chatId);
-      
-      console.log(`Messages marked as read for chat ${chatId}, new count: ${unreadCount}`);
-      io.to('admin-room').emit('updateUnreadCount', {
-        userId: chatId,
-        unreadCount,
+      const senderId = socket.data.user.id;
+      const isAdmin = socket.data.user.role === 'admin';
+      const chatThreadId = isAdmin ? targetUserId : senderId;
+
+      let finalContent = content;
+      if (messageType === 'image' || messageType === 'voice') {
+        if (!(content instanceof Buffer)) {
+          throw new Error('File content must be a Buffer for image or voice messages');
+        }
+        finalContent = await StorageService.uploadFileFromSocket(content, messageType === 'image' ? 'image' : 'audio');
+      }
+
+      const updatedChat = await ChatService.saveMessage(chatThreadId, senderId, messageType, finalContent);
+      const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
+
+      const messagePayload = {
+        _id: newMessage._id.toString(),
+        chatId: updatedChat._id.toString(),
+        senderId,
+        content: newMessage.content,
+        messageType: newMessage.message_type,
+        timestamp: newMessage.timestamp,
+        status: 'delivered',
+        isAdmin,
+        read: newMessage.read_by_admin,
+      };
+
+      if (isAdmin) {
+        io.to(targetUserId).emit('newMessage', { ...messagePayload, isSelf: false });
+        socket.emit('messageDelivered', { ...messagePayload, isSelf: true });
+      } else {
+        io.to('admin-room').emit('newMessage', { ...messagePayload, isSelf: false });
+        socket.emit('messageDelivered', { ...messagePayload, isSelf: true });
+        const unreadCount = await ChatRepository.getUnreadCount(chatThreadId);
+        console.log(`Emitting updateUnreadCount for user ${chatThreadId}: ${unreadCount}`);
+        io.to('admin-room').emit('updateUnreadCount', { userId: chatThreadId, unreadCount });
+      }
+      ack?.({ status: 'success', message: messagePayload });
+
+      io.to('admin-room').emit('updateUserOrder', {
+        userId: chatThreadId,
+        timestamp: newMessage.timestamp,
       });
-      io.to(chatId).emit('messagesRead', { 
-        chatId,
-        readBy: userId,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
+    } catch (error: any) {
+      console.error('[sendMessage] Error:', error.message);
+      socket.emit('messageError', { tempId, error: error.message });
+      ack?.({ status: 'error', error: error.message });
     }
   });
 
@@ -149,17 +167,10 @@ io.on('connection', (socket: Socket) => {
     try {
       const senderId = socket.data.user.id;
       const chat = await ChatThread.findOne({ 'messages._id': messageId }) as IChatThread | null;
-      if (!chat) {
-        throw new Error('Chat thread not found');
-      }
-
-      // Find the message in the messages array (since id() may not work with TypeScript)
-      const message = chat.messages.find((msg: IMessage) => msg._id?.toString() === messageId);
-      if (!message) {
+      if (!chat || !chat.messages.find((msg) => msg._id?.toString() === messageId)) {
         throw new Error('Message not found');
       }
-
-      if (message.sender_id.toString() !== senderId) {
+      if (chat.messages.find((msg) => msg._id?.toString() === messageId)!.sender_id.toString() !== senderId) {
         throw new Error('You can only edit your own messages');
       }
 
@@ -170,94 +181,45 @@ io.on('connection', (socket: Socket) => {
         isEdited: true,
       };
 
-      const targetUserId = chat.user_id.toString();
-      io.to(targetUserId).emit('messageEdited', messagePayload);
+      io.to(chat.user_id.toString()).emit('messageEdited', messagePayload);
       io.to('admin-room').emit('messageEdited', messagePayload);
       ack?.({ status: 'success', message: messagePayload });
     } catch (error) {
-      socket.emit('messageError', { error: (error as Error).message });
       ack?.({ status: 'error', error: (error as Error).message });
     }
   });
 
   socket.on('deleteMessage', async ({ messageId }, ack) => {
-    console.log('Server received deleteMessage event for messageId:', messageId); // Add this
     try {
       const senderId = socket.data.user.id;
       const chat = await ChatThread.findOne({ 'messages._id': messageId }) as IChatThread | null;
-      if (!chat) {
-        throw new Error('Chat thread not found');
-      }
-      const message = chat.messages.find((msg: IMessage) => msg._id?.toString() === messageId);
-      if (!message) {
+      if (!chat || !chat.messages.find((msg) => msg._id?.toString() === messageId)) {
         throw new Error('Message not found');
       }
-      if (message.sender_id.toString() !== senderId) {
+      if (chat.messages.find((msg) => msg._id?.toString() === messageId)!.sender_id.toString() !== senderId) {
         throw new Error('You can only delete your own messages');
       }
+
       await ChatService.deleteMessage(messageId);
-      const targetUserId = chat.user_id.toString();
-      console.log(`Emitting messageDeleted to user ${targetUserId} and admin-room for messageId: ${messageId}`); // Already present
-      io.to(targetUserId).emit('messageDeleted', { messageId });
+      io.to(chat.user_id.toString()).emit('messageDeleted', { messageId });
       io.to('admin-room').emit('messageDeleted', { messageId });
       ack?.({ status: 'success' });
     } catch (error) {
-      console.error('Error in deleteMessage:', (error as Error).message);
-      socket.emit('messageError', { error: (error as Error).message });
       ack?.({ status: 'error', error: (error as Error).message });
     }
   });
 
-  socket.on('sendMessage', async ({ targetUserId, messageType, content, tempId }, ack) => {
-    try {
-      const senderId = socket.data.user.id;
-      const senderRole = socket.data.user.role;
-      const isAdmin = senderRole === 'admin';
-      const chatThreadId = isAdmin ? targetUserId : senderId;
-  
-      const updatedChat = await ChatService.saveMessage(chatThreadId, senderId, messageType, content);
-      const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
-  
-      const messagePayload = {
-        _id: newMessage._id.toString(),
-        chatId: updatedChat._id.toString(),
-        senderId,
-        content: newMessage.content,
-        messageType: newMessage.message_type,
-        timestamp: newMessage.timestamp,
-        status: 'delivered',
-        isAdmin,
-        read: isAdmin ? true : false,
-      };
-  
-      if (isAdmin) {
-        io.to(targetUserId).emit('newMessage', messagePayload);
-      } else {
-        io.to('admin-room').emit('newMessage', messagePayload);
-        const unreadCount = await ChatRepository.getUnreadCount(chatThreadId);
-        io.to('admin-room').emit('updateUnreadCount', { userId: chatThreadId, unreadCount });
-        syncUnreadCounts(socket);
-      }
-      socket.emit('messageDelivered', messagePayload);
-      ack?.({ status: 'success', message: messagePayload });
-  
-      // Emit updateUserOrder for real-time sorting
-      console.log(`Emitting updateUserOrder for user ${chatThreadId} with timestamp ${newMessage.timestamp}`);
-      io.to('admin-room').emit('updateUserOrder', {
-        userId: chatThreadId,
-        timestamp: newMessage.timestamp,
-      });
-    } catch (error: any) {
-      console.error('Message sending error:', error);
-      socket.emit('messageError', { tempId, error: error.message });
-      ack?.({ status: 'error', error: error.message });
-    }
+  socket.on('markMessagesAsRead', async ({ chatId }) => {
+    if (!isAdmin) return;
+    await ChatRepository.markMessagesAsRead(chatId, userId);
+    const unreadCount = await ChatRepository.getUnreadCount(chatId);
+    console.log(`Messages marked as read for chat ${chatId}, new unread count: ${unreadCount}`);
+    io.to('admin-room').emit('updateUnreadCount', { userId: chatId, unreadCount });
+    io.to(chatId).emit('messagesRead', { chatId, readBy: userId, timestamp: new Date().toISOString() });
   });
+
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${userId}`);
-    if (isAdmin) {
-      console.log(`Admin ${userId} left admin-room`);
-    }
   });
 });
 

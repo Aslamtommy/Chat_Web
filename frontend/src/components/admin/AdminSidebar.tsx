@@ -25,6 +25,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   const previousSelectedUserId = useRef<string | null>(null);
   const debounceTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const socketConnected = useRef(false);
+  const hasFetchedInitialCounts = useRef(false); // Track if initial counts have been received
 
   const debouncedSearch = useCallback((query: string) => {
     if (debounceTimeout.current) {
@@ -34,15 +35,6 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       setSearchQuery(query.trim());
     }, 300);
   }, []);
-
-  const syncUnreadCounts = useCallback(() => {
-    if (socketConnected.current) {
-      console.log('Requesting unread count sync...');
-      socket.emit('syncUnreadCounts');
-    } else {
-      console.log('Socket not connected, cannot sync unread counts');
-    }
-  }, [socket]);
 
   const sortUsersByTimestamp = useCallback((usersList: User[]) => {
     const sorted = usersList.sort((a, b) => {
@@ -54,55 +46,39 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     return sorted;
   }, []);
 
-  useEffect(() => {
-    const fetchUserList = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const userList = await adminService.getAllUsers();
-        const initialUsers = userList.map((user: any) => ({
-          _id: user._id,
-          username: user.username,
-          lastMessageTimestamp: user.lastMessageTimestamp || null,
-          unreadCount: 0,
-        }));
-        console.log('Fetched users:', initialUsers);
-        setUsers(sortUsersByTimestamp(initialUsers));
-        syncUnreadCounts();
-      } catch (err) {
-        setError('Failed to load users');
-        console.error('Error fetching users:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchUserList = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const userList = await adminService.getAllUsers();
+      const initialUsers = userList.map((user: any) => ({
+        _id: user._id,
+        username: user.username,
+        lastMessageTimestamp: user.lastMessageTimestamp || null,
+        unreadCount: 0, // Will be updated by socket
+      }));
+      console.log('Fetched users:', initialUsers);
+      setUsers(sortUsersByTimestamp(initialUsers));
+    } catch (err) {
+      setError('Failed to load users');
+      console.error('Error fetching users:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sortUsersByTimestamp]);
 
+  useEffect(() => {
     fetchUserList();
 
-    // Handle real-time updates for user order (both user-to-admin and admin-to-user messages)
-    const handleUpdateUserOrder = ({ userId, timestamp }: { userId: string; timestamp: string }) => {
-      console.log('Received updateUserOrder - userId:', userId, 'timestamp:', timestamp);
-      setUsers((prev) => {
-        const updatedUsers = prev.map((user) =>
-          user._id === userId
-            ? {
-                ...user,
-                lastMessageTimestamp: timestamp, // Update timestamp for the user
-                unreadCount: selectedUserId === userId ? 0 : (user.unreadCount || 0) + 1, // Reset if selected, increment if not
-              }
-            : user
-        );
-        const sortedUsers = sortUsersByTimestamp([...updatedUsers]);
-        console.log(
-          'After updateUserOrder, top user:',
-          sortedUsers[0]?.username,
-          'timestamp:',
-          sortedUsers[0]?.lastMessageTimestamp,
-          'selectedUserId:',
-          selectedUserId
-        );
-        return sortedUsers;
-      });
+    const handleConnect = () => {
+      console.log('Socket connected');
+      socketConnected.current = true;
+      hasFetchedInitialCounts.current = false; // Reset on reconnect
+    };
+
+    const handleDisconnect = () => {
+      console.log('Socket disconnected');
+      socketConnected.current = false;
     };
 
     const handleInitialUnreadCounts = (unreadCounts: { [key: string]: number }) => {
@@ -112,6 +88,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
           ...user,
           unreadCount: unreadCounts[user._id] || 0,
         }));
+        hasFetchedInitialCounts.current = true; // Mark as received
         return sortUsersByTimestamp(updatedUsers);
       });
     };
@@ -128,15 +105,16 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       });
     };
 
-    const handleConnect = () => {
-      console.log('Socket connected');
-      socketConnected.current = true;
-      syncUnreadCounts();
-    };
-
-    const handleDisconnect = () => {
-      console.log('Socket disconnected');
-      socketConnected.current = false;
+    const handleUpdateUserOrder = ({ userId, timestamp }: { userId: string; timestamp: string }) => {
+      console.log('Received updateUserOrder - userId:', userId, 'timestamp:', timestamp);
+      setUsers((prev) => {
+        const updatedUsers = prev.map((user) =>
+          user._id === userId
+            ? { ...user, lastMessageTimestamp: timestamp }
+            : user
+        );
+        return sortUsersByTimestamp(updatedUsers);
+      });
     };
 
     socket.on('connect', handleConnect);
@@ -147,7 +125,6 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
 
     if (socket.connected) {
       socketConnected.current = true;
-      syncUnreadCounts();
     }
 
     return () => {
@@ -156,16 +133,16 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       socket.off('initialUnreadCounts', handleInitialUnreadCounts);
       socket.off('updateUnreadCount', handleUpdateUnreadCount);
       socket.off('updateUserOrder', handleUpdateUserOrder);
-      
+
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current);
       }
     };
-  }, [socket, selectedUserId, syncUnreadCounts, sortUsersByTimestamp]);
+  }, [socket, sortUsersByTimestamp, fetchUserList]);
 
   useEffect(() => {
     if (previousSelectedUserId.current && !selectedUserId) {
-      syncUnreadCounts();
+      // No action needed here; counts persist via socket
     }
     previousSelectedUserId.current = selectedUserId;
 
@@ -176,7 +153,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
         )
       );
     }
-  }, [selectedUserId, syncUnreadCounts]);
+  }, [selectedUserId]);
 
   const handleUserClick = async (userId: string) => {
     try {
@@ -213,7 +190,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       </div>
 
       <div className="p-4 space-y-2">
-        {isLoading ? (
+        {isLoading && !hasFetchedInitialCounts.current ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
           </div>

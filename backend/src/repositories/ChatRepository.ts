@@ -19,19 +19,19 @@ class ChatRepository {
   }
 
   async addMessage(userId: string, message: IMessage): Promise<IChatThread> {
+    console.log(`[addMessage] Adding message for user: ${userId}, content: ${message.content}, timestamp: ${new Date().toISOString()}`);
     const updatedChat = await ChatThread.findOneAndUpdate(
-      { user_id: userId },
-      { 
-        $push: { messages: message },
-        $set: { last_read_by_admin: null } // Reset last_read_by_admin when new message arrives
-      },
-      { new: true, upsert: true }
+        { user_id: userId },
+        { 
+            $push: { messages: message },
+            $set: { last_read_by_admin: null }
+        },
+        { new: true, upsert: true }
     ).lean<IChatThread>();
-
-    // Invalidate cache for this user
+    console.log(`[addMessage] Message added for user: ${userId}, message ID: ${updatedChat.messages[updatedChat.messages.length - 1]._id}`);
     unreadCountsCache.delete(userId);
     return updatedChat;
-  }
+}
 
   async getAllThreads(): Promise<IChatThread[]> {
     return ChatThread.find()
@@ -101,17 +101,20 @@ class ChatRepository {
   }
 
   async getUnreadCount(userId: string): Promise<number> {
+    console.log(`[getUnreadCount] Called for user: ${userId}, timestamp: ${new Date().toISOString()}`);
     const thread = await ChatThread.findOne({ user_id: userId })
-      .select('messages')
-      .lean<IChatThread>();
-      
-    if (!thread) return 0;
-    
-    // Count only messages from the user (sender_id matches userId) where read_by_admin is false
-    return thread.messages.filter(
-      msg => msg.sender_id.toString() === userId && msg.read_by_admin === false
+        .select('messages')
+        .lean<IChatThread>();
+    if (!thread) {
+        console.log(`[getUnreadCount] No thread found for user: ${userId}`);
+        return 0;
+    }
+    const count = thread.messages.filter(
+        msg => msg.sender_id.toString() === userId && msg.read_by_admin === false
     ).length;
-  }
+    console.log(`[getUnreadCount] Unread count for user ${userId}: ${count}, messages: ${thread.messages.length}`);
+    return count;
+}
   async updateMessage(messageId: string, content: string): Promise<IMessage> {
     const chat = await ChatThread.findOneAndUpdate(
       { 'messages._id': messageId },

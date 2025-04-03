@@ -418,7 +418,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           </div>
   
           {/* Fixed Input */}
-          <div className="fixed bottom-0 left-0 right-0 z-10 bg-black/20 backdrop-blur-sm border-t border-white/10 p-2">
+          <div className="fixed bottom-12 left-0 right-0 z-10 bg-black/20 backdrop-blur-sm border-t border-white/10 p-2">
             <ChatInput onSend={handleSend} />
           </div>
   
