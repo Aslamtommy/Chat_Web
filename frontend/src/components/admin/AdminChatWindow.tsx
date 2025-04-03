@@ -240,10 +240,19 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       scrollToBottom();
 
       try {
+
+        let messageContent: string | ArrayBuffer;
+        if (messageType === 'text') {
+          messageContent = content as string;
+        } else {
+          // Use ArrayBuffer instead of base64
+          messageContent = await (content as File).arrayBuffer();
+        }
+
         const messageData = {
           targetUserId: userId,
           messageType,
-          content: messageType === 'text' ? content : await convertFileToBase64(content as File),
+          content: messageType === 'text' ? content :messageContent,
           tempId,
         };
         console.log('Sending message via socket:', messageData);
@@ -288,15 +297,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     [userId, scrollToBottom, socket]
   );
 
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
+ 
   const handleEditStart = (messageId: string, content: string) => {
     setEditingMessageId(messageId);
     setEditedContent(content);
