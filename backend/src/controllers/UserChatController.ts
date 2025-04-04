@@ -18,7 +18,7 @@ class UserChatController {
   async sendMessageToMyChat(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { messageType } = req.body;
+      const { messageType,duration } = req.body;
       let content: string;
 
       if (!messageType) throw new Error('messageType is required');
@@ -34,7 +34,7 @@ class UserChatController {
       }
 
       console.log(`[sendMessageToMyChat] Saving message for user: ${userId}, content: ${content}`);
-      const updatedChat = await ChatService.saveMessage(userId, userId, messageType, content);
+      const updatedChat = await ChatService.saveMessage(userId, userId, messageType, content,duration);
       const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
       if (!newMessage || !newMessage._id) {
         throw new Error('Message not saved properly');

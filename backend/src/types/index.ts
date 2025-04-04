@@ -21,7 +21,8 @@ export interface IMessage {
   timestamp?: Date;
   read_by_admin?: boolean; // Changed to required with default false in schema
   isEdited?:boolean,
-  isDeleted?:boolean
+  isDeleted?:boolean,
+  duration?:any
 }
 
 export interface IChatThread extends Document {

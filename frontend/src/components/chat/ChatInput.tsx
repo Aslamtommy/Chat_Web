@@ -12,11 +12,10 @@ interface ChatInputProps {
 const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [, forceUpdate] = useState(0); // Dummy state to force re-render
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startRecording = async () => {
@@ -25,6 +24,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
+      startTimeRef.current = Date.now(); // Set start time for duration calculation
+      console.log('Start time set to:', startTimeRef.current);
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -35,28 +36,20 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
-        onSend('voice', audioFile, duration);
+        const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        onSend('voice', audioFile, finalDuration);
         stream.getTracks().forEach((track) => track.stop());
+        console.log('Recording stopped, final duration:', finalDuration);
       };
 
       mediaRecorder.start();
       setIsRecording(true);
-      setDuration(0);
 
-      // Clear any existing timer
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
 
-      timerRef.current = setInterval(() => {
-        setDuration((prev) => {
-          const newDuration = prev + 1;
-          console.log('Timer tick, duration:', newDuration); // Debug log
-          forceUpdate(newDuration); // Force re-render
-          return newDuration;
-        });
-      }, 1000);
-
+      // No need for updateDuration timer since we're not displaying the count
       console.log('Recording started');
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -73,7 +66,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
-      console.log('Recording stopped, final duration:', duration);
     }
   };
 
@@ -99,16 +91,12 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
     fileInputRef.current?.click();
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
   useEffect(() => {
+    console.log('ChatInput rendered, isRecording:', isRecording);
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
@@ -140,9 +128,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
           {isRecording ? (
             <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-xl">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-white text-sm">
-                {formatDuration(duration)}
-              </span>
+              <span className="text-white text-sm">Recording</span>
               <button
                 type="button"
                 onClick={stopRecording}

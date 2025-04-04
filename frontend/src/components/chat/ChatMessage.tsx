@@ -68,9 +68,9 @@ const ChatMessage: React.FC<MessageProps> = ({
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    if (mins === 0) return `${secs} sec`;
+    return secs === 0 ? `${mins} min` : `${mins} min ${secs} sec`;
   };
-
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) {

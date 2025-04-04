@@ -9,6 +9,7 @@ const messageSchema = new Schema<IMessage>({
   read_by_admin: { type: Boolean, default: false }, // Default is false
   isEdited: { type: Boolean, default: false }, // New field for edit tracking
   isDeleted: { type: Boolean, default: false }, // New field for soft deletion
+  duration: { type: Number }, // Add this line
 });
 
 // Add index for faster message queries

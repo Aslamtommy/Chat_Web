@@ -87,6 +87,7 @@ const Home = () => {
           messageType: msg.message_type || 'text',
           status: 'delivered' as const,
           senderId: msg.sender_id.toString(),
+          duration: msg.duration || 0,
           timestamp: msg.timestamp || new Date().toISOString(),
           isEdited: msg.isEdited || false,
           isDeleted: msg.isDeleted || false,
@@ -145,7 +146,7 @@ const Home = () => {
         messageType,
         status: 'sending',
         senderId: userId.current,
-        duration,
+        duration:messageType === 'voice' ? duration : undefined,
         timestamp: tempTimestamp,
       };
 
@@ -164,6 +165,7 @@ const Home = () => {
           targetUserId: 'admin',
           messageType,
           content: finalContent,
+          duration: messageType === 'voice' ? duration : undefined,
           tempId,
         },
         (ack: { status: string; message?: Message; error?: string }) => {

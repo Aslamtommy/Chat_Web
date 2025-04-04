@@ -19,6 +19,7 @@ interface Message {
   timestamp?: string;
   isEdited?: boolean;
   isDeleted?: boolean;
+  duration:any;
 }
 
 interface PaymentDetails {
@@ -122,6 +123,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               status: 'delivered' as const,
               senderId: msg.sender_id.toString(),
               chatId: chat._id.toString(),
+              duration: msg.duration || 0,
               timestamp: msg.timestamp || new Date().toISOString(),
               isEdited: msg.isEdited || false,
               isDeleted: msg.isDeleted || false,
@@ -129,7 +131,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           })
           .filter((msg: any): msg is Message => msg !== null)
           // Sort in descending order (latest first)
-          .sort((a: any, b: any) => new Date(b.timestamp || '').getTime() - new Date(a.timestamp || '').getTime());
+          .sort((a: any, b: any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
         setMessages(formattedMessages);
         // Scroll after messages are set
@@ -232,7 +234,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const handleSend = useCallback(
-    async (messageType: 'text' | 'image' | 'voice', content: string | File) => {
+    async (messageType: 'text' | 'image' | 'voice', content: string | File, duration?: number) => {
       if (!userId || !adminId.current || !socket) return;
 
       const tempId = Date.now().toString();
@@ -245,6 +247,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         status: 'sending',
         senderId: adminId.current,
         chatId: userId,
+        duration: messageType === 'voice' ? duration : undefined,
         timestamp: tempTimestamp,
       };
       setMessages((prev) => [...prev, tempMessage]);
@@ -262,6 +265,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           targetUserId: userId,
           messageType,
           content: messageContent,
+          duration: messageType === 'voice' ? duration : undefined,
           tempId,
         };
         console.log('Sending message via socket:', {

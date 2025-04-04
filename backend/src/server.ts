@@ -116,7 +116,7 @@ io.on('connection', (socket: Socket) => {
       console.log('Admin requested syncUnreadCounts');
     }
   });
-  socket.on('sendMessage', async ({ targetUserId, messageType, content, tempId }, ack) => {
+  socket.on('sendMessage', async ({ targetUserId, messageType, content,duration, tempId }, ack) => {
     try {
       const senderId = socket.data.user.id;
       const isAdmin = socket.data.user.role === 'admin';
@@ -130,7 +130,7 @@ io.on('connection', (socket: Socket) => {
         finalContent = await StorageService.uploadFileFromSocket(content, messageType === 'image' ? 'image' : 'audio');
       }
 
-      const updatedChat = await ChatService.saveMessage(chatThreadId, senderId, messageType, finalContent);
+      const updatedChat = await ChatService.saveMessage(chatThreadId, senderId, messageType, finalContent,duration);
       const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
 
       const messagePayload = {
@@ -139,6 +139,7 @@ io.on('connection', (socket: Socket) => {
         senderId,
         content: newMessage.content,
         messageType: newMessage.message_type,
+        duration: newMessage.duration,
         timestamp: newMessage.timestamp,
         status: 'delivered',
         isAdmin,

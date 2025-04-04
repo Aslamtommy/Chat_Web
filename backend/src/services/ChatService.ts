@@ -12,11 +12,12 @@ class ChatService {
     return chat;
   }
 
-  async saveMessage(chatThreadId: string, senderId: any, messageType: 'text' | 'image' | 'voice', content: string): Promise<IChatThread> {
+  async saveMessage(chatThreadId: string, senderId: any, messageType: 'text' | 'image' | 'voice', content: string,duration:any): Promise<IChatThread> {
     const message: IMessage = {
       sender_id: new mongoose.Types.ObjectId(senderId),
       message_type: messageType,
       content,
+      duration,
       timestamp: new Date(),
     };
 
