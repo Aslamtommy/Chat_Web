@@ -52,16 +52,11 @@ const ChatMessage: React.FC<MessageProps> = ({
 
   const getStatusColor = () => {
     switch (status) {
-      case 'sending':
-        return 'text-white/50';
-      case 'sent':
-        return 'text-amber-300';
-      case 'delivered':
-        return 'text-amber-500';
-      case 'failed':
-        return 'text-red-400';
-      default:
-        return 'text-white/50';
+      case 'sending': return 'text-white/50';
+      case 'sent': return 'text-amber-300';
+      case 'delivered': return 'text-amber-500';
+      case 'failed': return 'text-red-400';
+      default: return 'text-white/50';
     }
   };
 
@@ -71,6 +66,7 @@ const ChatMessage: React.FC<MessageProps> = ({
     if (mins === 0) return `${secs} sec`;
     return secs === 0 ? `${mins} min` : `${mins} min ${secs} sec`;
   };
+
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -103,7 +99,6 @@ const ChatMessage: React.FC<MessageProps> = ({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
- 
         setIsMenuOpen(false);
       }
     };
@@ -172,12 +167,22 @@ const ChatMessage: React.FC<MessageProps> = ({
             </div>
           )}
           {(messageType === 'image' || messageType === 'screenshot') && (
-            <img
-              src={content}
-              alt="chat"
-              className="rounded-xl max-w-[180px] sm:max-w-[200px] cursor-pointer hover:opacity-90 transition-opacity duration-300"
-              onClick={() => setShowFullImage(true)}
-            />
+            <div className="relative">
+              <img
+                src={content}
+                alt="chat"
+                className="rounded-xl max-w-[180px] sm:max-w-[200px] cursor-pointer hover:opacity-90 transition-opacity duration-300"
+                onClick={() => setShowFullImage(true)}
+              />
+              {isSelf && (
+                <button
+                  onClick={toggleMenu}
+                  className="absolute top-1 right-1 text-white/60 hover:text-white focus:outline-none bg-black/30 rounded-full p-1"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           )}
           {messageType === 'voice' && (
             <div className="flex items-center gap-3 min-w-[200px] sm:min-w-[250px]">
@@ -213,6 +218,14 @@ const ChatMessage: React.FC<MessageProps> = ({
                 </div>
               </div>
               <audio ref={audioRef} src={content} onEnded={() => setIsPlaying(false)} className="hidden" />
+              {isSelf && (
+                <button
+                  onClick={toggleMenu}
+                  className="ml-2 text-white/60 hover:text-white focus:outline-none"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+              )}
             </div>
           )}
           <div className="flex items-center justify-end mt-1.5 space-x-1">
@@ -229,19 +242,21 @@ const ChatMessage: React.FC<MessageProps> = ({
               </span>
             )}
           </div>
-          {isMenuOpen && messageType === 'text' && !isEditing && isSelf && (
+          {isMenuOpen && isSelf && !isEditing && (
             <div className="absolute top-6 right-6 bg-gray-800 text-white rounded-lg shadow-lg z-10 py-2 w-32">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  console.log('Edit clicked for message:', _id);
-                  onEdit?.();
-                  setIsMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-1 hover:bg-gray-700 flex items-center text-sm"
-              >
-                <Edit2 className="w-4 h-4 mr-2" /> Edit
-              </button>
+              {messageType === 'text' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log('Edit clicked for message:', _id);
+                    onEdit?.();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-1 hover:bg-gray-700 flex items-center text-sm"
+                >
+                  <Edit2 className="w-4 h-4 mr-2" /> Edit
+                </button>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -257,9 +272,9 @@ const ChatMessage: React.FC<MessageProps> = ({
           )}
         </div>
       </div>
-      
+
       {showFullImage && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
           onClick={() => setShowFullImage(false)}
         >
@@ -276,13 +291,14 @@ const ChatMessage: React.FC<MessageProps> = ({
           />
         </div>
       )}
-      
+
       <DeleteModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={() => {
-          console.log('Delete confirmed for message:', _id); // Add this
+          console.log('Delete confirmed for message:', _id);
           onDelete?.();
+          setIsDeleteModalOpen(false); // Close modal after confirmation
         }}
         messageId={_id}
       />
