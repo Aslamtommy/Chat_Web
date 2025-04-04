@@ -19,7 +19,7 @@ interface Message {
   timestamp?: string;
   isEdited?: boolean;
   isDeleted?: boolean;
-  duration:any;
+  duration: any;
 }
 
 interface PaymentDetails {
@@ -130,12 +130,10 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             };
           })
           .filter((msg: any): msg is Message => msg !== null)
-          // Sort in descending order (latest first)
           .sort((a: any, b: any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
         setMessages(formattedMessages);
-        // Scroll after messages are set
-        setTimeout(() => scrollToBottom(), 100); // Increased delay to ensure DOM updates
+        setTimeout(() => scrollToBottom(), 100);
         markMessagesAsRead();
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
@@ -153,7 +151,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           ...prev,
           { ...message, status: 'delivered' as const, isSelf: isAdminMessage },
         ]);
-        // Scroll after new message
         setTimeout(() => scrollToBottom(), 100);
         if (!isAdminMessage) markMessagesAsRead();
       }
@@ -200,9 +197,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
   }, [userId, socket, markMessagesAsRead, fetchPaymentRequests]);
 
-  // Scroll to bottom whenever messages change
   useEffect(() => {
-    setTimeout(() => scrollToBottom(), 100); // Delay to ensure DOM updates
+    setTimeout(() => scrollToBottom(), 100);
   }, [messages, scrollToBottom]);
 
   const handleRequestScreenshot = async () => {
@@ -251,7 +247,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         timestamp: tempTimestamp,
       };
       setMessages((prev) => [...prev, tempMessage]);
-      setTimeout(() => scrollToBottom(), 100); // Delay to ensure DOM updates
+      setTimeout(() => scrollToBottom(), 100);
 
       try {
         let messageContent: string | ArrayBuffer;
@@ -294,7 +290,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               userId: userId,
               timestamp: savedMessage.timestamp,
             });
-            setTimeout(() => scrollToBottom(), 100); // Delay to ensure DOM updates
+            setTimeout(() => scrollToBottom(), 100);
           } else {
             console.error('Failed to send message via socket:', response);
             setMessages((prev) =>
@@ -309,7 +305,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         );
       }
     },
-    [userId, socket] // Removed scrollToBottom from dependencies
+    [userId, socket]
   );
 
   const handleEditStart = (messageId: string, content: string) => {
@@ -363,175 +359,272 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   return (
-    <div className="flex flex-col h-screen bg-black/40 backdrop-blur-sm relative">
+    <div className="flex flex-col h-full bg-black/40 backdrop-blur-sm">
       {userId ? (
         <>
-          {/* Fixed Header */}
-          <div className="fixed top-0 left-0 right-0 z-20 bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-b border-white/10 px-3 py-2">
-            <div className="flex items-center justify-between">
+          {/* Header */}
+          <div className="sticky top-0 z-20 bg-gradient-to-r from-black/95 via-black/90 to-black/95 border-b border-amber-500/10 backdrop-blur-xl">
+            <div className="flex items-center justify-between px-3 py-2">
               <div className="flex items-center space-x-2 min-w-0">
                 {isMobile && onBack && (
                   <button
                     onClick={onBack}
-                    className="md:hidden p-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30 flex-shrink-0"
+                    className="md:hidden p-1.5 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30 flex-shrink-0"
                   >
-                    <ArrowLeft className="w-5 h-5" />
+                    <ArrowLeft className="w-4 h-4" />
                   </button>
                 )}
-                <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center border border-amber-500/30 flex-shrink-0">
-                  <span className="text-sm font-medium text-amber-500">
-                    {username?.charAt(0).toUpperCase()}
-                  </span>
+                <div className="relative group flex-shrink-0">
+                  <div className="w-8 h-8 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-lg flex items-center justify-center border border-amber-500/20 transition-all duration-300 group-hover:border-amber-500/30">
+                    <span className="text-sm font-medium text-amber-400 group-hover:text-amber-300">
+                      {username?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="absolute -inset-0.5 bg-amber-500/10 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 </div>
-                <h3 className="text-base font-medium text-white truncate">{username || 'User'}</h3>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium text-amber-50/90 truncate">{username || 'User'}</h3>
+                  <p className="text-[10px] text-amber-400/60 truncate">Active Now</p>
+                </div>
               </div>
-              <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="flex items-center space-x-1 flex-shrink-0">
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowUserDetails(true)}
-                  className="p-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
+                  className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
                   title="View User Details"
                 >
-                  <User className="w-4 h-4" />
+                  <User className="w-3 h-3" />
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowPaymentRequests(true)}
-                  className="p-2 rounded-lg bg-amber-500/20 text-white hover:bg-amber-500/30 border border-amber-500/30"
+                  className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
                   title="View Payment Requests"
                 >
-                  <Image className="w-4 h-4" />
+                  <Image className="w-3 h-3" />
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setShowRequestModal(true)}
-                  className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-3 py-1.5 rounded-lg hover:from-amber-700 hover:to-amber-800 border border-amber-500/30"
+                  className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-300 px-3 py-1.5 rounded-lg hover:text-amber-200 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300"
                   title="Request Payment Screenshot"
                 >
-                  <DollarSign className="w-4 h-4" />
+                  <DollarSign className="w-3 h-3" />
                 </motion.button>
               </div>
             </div>
           </div>
 
-          {/* Scrollable Chat List */}
-          <div
-            ref={chatContainerRef}
-            className="flex-1 overflow-y-auto pt-14 pb-20 px-2"
-          >
-            <ChatList
-              messages={messages}
-              editingMessageId={editingMessageId}
-              editedContent={editedContent}
-              setEditedContent={setEditedContent}
-              onEditStart={handleEditStart}
-              onEditSave={handleEditSave}
-              onEditCancel={() => setEditingMessageId(null)}
-              onDelete={handleDelete}
-              // Removed ref prop here; it's now on the div
-            />
+          {/* Chat Container */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Messages */}
+            <div
+              ref={chatContainerRef}
+              className="flex-1 overflow-y-auto px-3 sm:px-4 pb-2 scrollbar-thin scrollbar-thumb-amber-500/20 scrollbar-track-transparent"
+            >
+              <ChatList
+                messages={messages}
+                editingMessageId={editingMessageId}
+                editedContent={editedContent}
+                setEditedContent={setEditedContent}
+                onEditStart={handleEditStart}
+                onEditSave={handleEditSave}
+                onEditCancel={() => setEditingMessageId(null)}
+                onDelete={handleDelete}
+              />
+            </div>
+
+            {/* Input */}
+            <div className="sticky bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/90 to-black/85 backdrop-blur-xl border-t border-amber-500/10">
+              <div className="px-2 py-1 sm:px-3 sm:py-1">
+                <ChatInput onSend={handleSend} />
+              </div>
+            </div>
           </div>
 
-          {/* Fixed Input */}
-          <div className="fixed bottom-12 left-0 right-0 z-10 bg-black/20 backdrop-blur-sm border-t border-white/10 p-2">
-            <ChatInput onSend={handleSend} />
-          </div>
-
-          {/* Payment Request Modal */}
-          <AnimatePresence>
-            {showRequestModal && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
-              >
+          {/* Modals */}
+          <div className="z-30">
+            {/* Payment Request Modal */}
+            <AnimatePresence>
+              {showRequestModal && (
                 <motion.div
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-md"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
                 >
-                  <h4 className="text-lg font-semibold text-white mb-3">Request Payment Screenshot</h4>
-                  <p className="text-white/80 text-sm mb-4">
-                    Enter payment details for {username || 'this user'}.
-                  </p>
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      name="accountNumber"
-                      value={paymentDetails.accountNumber}
-                      onChange={handleInputChange}
-                      placeholder="Account Number"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                    />
-                    <input
-                      type="text"
-                      name="ifscCode"
-                      value={paymentDetails.ifscCode}
-                      onChange={handleInputChange}
-                      placeholder="IFSC Code"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                    />
-                    <input
-                      type="text"
-                      name="amount"
-                      value={paymentDetails.amount}
-                      onChange={handleInputChange}
-                      placeholder="Amount (e.g., 500)"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                    />
-                    <input
-                      type="text"
-                      name="name"
-                      value={paymentDetails.name}
-                      onChange={handleInputChange}
-                      placeholder="Account Holder Name"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                    />
-                    <input
-                      type="text"
-                      name="upiId"
-                      value={paymentDetails.upiId}
-                      onChange={handleInputChange}
-                      placeholder="UPI ID (e.g., name@upi)"
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2 mt-4">
-                    <motion.button
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => setShowRequestModal(false)}
-                      className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-3 py-1.5 rounded-lg hover:from-gray-700 hover:to-gray-800 flex items-center space-x-1 text-sm"
-                    >
-                      <X className="w-4 h-4" />
-                      <span>Cancel</span>
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={handleRequestScreenshot}
-                      disabled={!isPaymentDetailsValid()}
-                      className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1 text-sm ${
-                        !isPaymentDetailsValid() ? 'opacity-60 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-800'
-                      }`}
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Send</span>
-                    </motion.button>
-                  </div>
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-md"
+                  >
+                    <h4 className="text-lg font-semibold text-white mb-3">Request Payment Screenshot</h4>
+                    <p className="text-white/80 text-sm mb-4">
+                      Enter payment details for {username || 'this user'}.
+                    </p>
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        name="accountNumber"
+                        value={paymentDetails.accountNumber}
+                        onChange={handleInputChange}
+                        placeholder="Account Number"
+                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                      />
+                      <input
+                        type="text"
+                        name="ifscCode"
+                        value={paymentDetails.ifscCode}
+                        onChange={handleInputChange}
+                        placeholder="IFSC Code"
+                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                      />
+                      <input
+                        type="text"
+                        name="amount"
+                        value={paymentDetails.amount}
+                        onChange={handleInputChange}
+                        placeholder="Amount (e.g., 500)"
+                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                      />
+                      <input
+                        type="text"
+                        name="name"
+                        value={paymentDetails.name}
+                        onChange={handleInputChange}
+                        placeholder="Account Holder Name"
+                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                      />
+                      <input
+                        type="text"
+                        name="upiId"
+                        value={paymentDetails.upiId}
+                        onChange={handleInputChange}
+                        placeholder="UPI ID (e.g., name@upi)"
+                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-2 mt-4">
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setShowRequestModal(false)}
+                        className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-3 py-1.5 rounded-lg hover:from-gray-700 hover:to-gray-800 flex items-center space-x-1 text-sm"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>Cancel</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={handleRequestScreenshot}
+                        disabled={!isPaymentDetailsValid()}
+                        className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1 text-sm ${
+                          !isPaymentDetailsValid() ? 'opacity-60 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-800'
+                        }`}
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Send</span>
+                      </motion.button>
+                    </div>
+                  </motion.div>
                 </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              )}
+            </AnimatePresence>
 
-          {/* Payment Requests View Modal */}
-          <AnimatePresence>
-            {showPaymentRequests && (
+            {/* Payment Requests View Modal */}
+            <AnimatePresence>
+              {showPaymentRequests && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto"
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-lg font-semibold text-white">Payment Requests for {username}</h4>
+                      <button
+                        onClick={() => setShowPaymentRequests(false)}
+                        className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {paymentRequests
+                        .filter((pr) => pr.userId._id === userId)
+                        .map((pr) => (
+                          <motion.div
+                            key={pr._id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-3 bg-gray-800 rounded-lg border border-white/10"
+                          >
+                            <div className="space-y-1 text-sm text-gray-200">
+                              <div className="flex justify-between">
+                                <span className="font-medium text-gray-400">Account:</span>
+                                <span>{pr.paymentDetails.accountNumber}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="font-medium text-gray-400">IFSC:</span>
+                                <span>{pr.paymentDetails.ifscCode}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="font-medium text-gray-400">Amount:</span>
+                                <span className="text-amber-400 font-semibold">₹{pr.paymentDetails.amount}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="font-medium text-gray-400">Name:</span>
+                                <span>{pr.paymentDetails.name}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="font-medium text-gray-400">UPI:</span>
+                                <span>{pr.paymentDetails.upiId}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="font-medium text-gray-400">Status:</span>
+                                <span className={pr.status === 'uploaded' ? 'text-green-400' : 'text-yellow-400'}>
+                                  {pr.status.charAt(0).toUpperCase() + pr.status.slice(1)}
+                                </span>
+                              </div>
+                              {pr.screenshotUrl && (
+                                <div className="mt-2">
+                                  <a
+                                    href={pr.screenshotUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-amber-400 hover:underline flex items-center space-x-1 text-sm"
+                                  >
+                                    <Image className="w-4 h-4" />
+                                    <span>View Screenshot</span>
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        ))}
+                      {paymentRequests.filter((pr) => pr.userId._id === userId).length === 0 && (
+                        <p className="text-white/70 text-center text-sm">No payment requests found.</p>
+                      )}
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* User Details Modal */}
+            {showUserDetails && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -545,122 +638,40 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                   className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto"
                 >
                   <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-lg font-semibold text-white">Payment Requests for {username}</h4>
+                    <h4 className="text-lg font-semibold text-white">User Details</h4>
                     <button
-                      onClick={() => setShowPaymentRequests(false)}
+                      onClick={() => setShowUserDetails(false)}
                       className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  <div className="space-y-3">
-                    {paymentRequests
-                      .filter((pr) => pr.userId._id === userId)
-                      .map((pr) => (
-                        <motion.div
-                          key={pr._id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-3 bg-gray-800 rounded-lg border border-white/10"
-                        >
-                          <div className="space-y-1 text-sm text-gray-200">
-                            <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">Account:</span>
-                              <span>{pr.paymentDetails.accountNumber}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">IFSC:</span>
-                              <span>{pr.paymentDetails.ifscCode}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">Amount:</span>
-                              <span className="text-amber-400 font-semibold">₹{pr.paymentDetails.amount}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">Name:</span>
-                              <span>{pr.paymentDetails.name}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">UPI:</span>
-                              <span>{pr.paymentDetails.upiId}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="font-medium text-gray-400">Status:</span>
-                              <span className={pr.status === 'uploaded' ? 'text-green-400' : 'text-yellow-400'}>
-                                {pr.status.charAt(0).toUpperCase() + pr.status.slice(1)}
-                              </span>
-                            </div>
-                            {pr.screenshotUrl && (
-                              <div className="mt-2">
-                                <a
-                                  href={pr.screenshotUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-amber-400 hover:underline flex items-center space-x-1 text-sm"
-                                >
-                                  <Image className="w-4 h-4" />
-                                  <span>View Screenshot</span>
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      ))}
-                    {paymentRequests.filter((pr) => pr.userId._id === userId).length === 0 && (
-                      <p className="text-white/70 text-center text-sm">No payment requests found.</p>
-                    )}
-                  </div>
+                  <AdminUserDetails userId={userId} />
                 </motion.div>
               </motion.div>
             )}
-          </AnimatePresence>
+          </div>
 
-          {/* Toast Notification */}
+          {/* Toast */}
           <AnimatePresence>
             {showToast && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-16 left-2 right-2 md:bottom-4 md:right-4 md:left-auto bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md text-sm flex items-center justify-center space-x-2 z-30"
+                className="fixed bottom-20 left-2 right-2 md:bottom-6 md:right-4 md:left-auto bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md text-sm flex items-center justify-center space-x-2 z-30"
               >
                 <DollarSign className="w-4 h-4" />
                 <span>Screenshot request sent/received</span>
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* User Details Modal */}
-          {showUserDetails && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto"
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-lg font-semibold text-white">User Details</h4>
-                  <button
-                    onClick={() => setShowUserDetails(false)}
-                    className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                <AdminUserDetails userId={userId} />
-              </motion.div>
-            </motion.div>
-          )}
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-white/70 text-base">{isMobile ? 'Select a user to chat' : 'No user selected'}</p>
+          <p className="text-white/70 text-base">
+            {isMobile ? 'Select a user to chat' : 'No user selected'}
+          </p>
         </div>
       )}
     </div>
