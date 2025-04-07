@@ -212,15 +212,7 @@ const Home = () => {
     );
   };
 
-  const handleDelete = (messageId: string) => {
-    socketRef.current?.emit('deleteMessage', { messageId }, (response: { status: string }) => {
-      if (response.status === 'success') {
-        setMessages((prev) =>
-          prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
-        );
-      }
-    });
-  };
+   
 
   return (
     <div className="flex flex-col h-screen bg-black font-serif">
@@ -242,7 +234,7 @@ const Home = () => {
                 onEditStart={handleEditStart}
                 onEditSave={handleEditSave}
                 onEditCancel={() => setEditingMessageId(null)}
-                onDelete={handleDelete}
+                
               />
             </div>
             <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2 z-50">

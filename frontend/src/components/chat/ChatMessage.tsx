@@ -14,7 +14,7 @@ interface MessageProps {
   isDeleted?: boolean;
   senderId?: any;
   onEdit?: () => void;
-  onDelete?: () => void;
+  onDelete?: () => void; // Optional, only provided for admins
   isEditing?: boolean;
   editedContent?: string;
   onEditChange?: (content: string) => void;
@@ -92,7 +92,6 @@ const ChatMessage: React.FC<MessageProps> = ({
 
   const toggleMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('Menu toggled for message:', _id, 'isOpen:', !isMenuOpen);
     setIsMenuOpen((prev) => !prev);
   };
 
@@ -120,6 +119,8 @@ const ChatMessage: React.FC<MessageProps> = ({
     );
   }
 
+  const hasMenuOptions = onEdit || onDelete; // Show menu only if edit or delete is available
+
   return (
     <>
       <div className={`flex ${isSelf ? 'justify-end' : 'justify-start'} mb-3`} ref={menuRef}>
@@ -131,7 +132,7 @@ const ChatMessage: React.FC<MessageProps> = ({
           {messageType === 'text' && !isEditing && (
             <div className="flex items-start">
               <p className="break-words text-sm leading-relaxed flex-1">{content}</p>
-              {isSelf && (
+              {isSelf && hasMenuOptions && (
                 <button
                   onClick={toggleMenu}
                   className="ml-2 text-white/60 hover:text-white focus:outline-none"
@@ -174,7 +175,7 @@ const ChatMessage: React.FC<MessageProps> = ({
                 className="rounded-xl max-w-[180px] sm:max-w-[200px] cursor-pointer hover:opacity-90 transition-opacity duration-300"
                 onClick={() => setShowFullImage(true)}
               />
-              {isSelf && (
+              {isSelf && hasMenuOptions && (
                 <button
                   onClick={toggleMenu}
                   className="absolute top-1 right-1 text-white/60 hover:text-white focus:outline-none bg-black/30 rounded-full p-1"
@@ -218,7 +219,7 @@ const ChatMessage: React.FC<MessageProps> = ({
                 </div>
               </div>
               <audio ref={audioRef} src={content} onEnded={() => setIsPlaying(false)} className="hidden" />
-              {isSelf && (
+              {isSelf && hasMenuOptions && (
                 <button
                   onClick={toggleMenu}
                   className="ml-2 text-white/60 hover:text-white focus:outline-none"
@@ -244,12 +245,11 @@ const ChatMessage: React.FC<MessageProps> = ({
           </div>
           {isMenuOpen && isSelf && !isEditing && (
             <div className="absolute top-6 right-6 bg-gray-800 text-white rounded-lg shadow-lg z-10 py-2 w-32">
-              {messageType === 'text' && (
+              {messageType === 'text' && onEdit && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log('Edit clicked for message:', _id);
-                    onEdit?.();
+                    onEdit();
                     setIsMenuOpen(false);
                   }}
                   className="w-full text-left px-4 py-1 hover:bg-gray-700 flex items-center text-sm"
@@ -257,17 +257,18 @@ const ChatMessage: React.FC<MessageProps> = ({
                   <Edit2 className="w-4 h-4 mr-2" /> Edit
                 </button>
               )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  console.log('Delete clicked for message:', _id);
-                  setIsDeleteModalOpen(true);
-                  setIsMenuOpen(false);
-                }}
-                className="w-full text-left px-4 py-1 hover:bg-gray-700 flex items-center text-sm"
-              >
-                <Trash2 className="w-4 h-4 mr-2" /> Delete
-              </button>
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDeleteModalOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-1 hover:bg-gray-700 flex items-center text-sm"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Delete
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -292,16 +293,17 @@ const ChatMessage: React.FC<MessageProps> = ({
         </div>
       )}
 
-      <DeleteModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={() => {
-          console.log('Delete confirmed for message:', _id);
-          onDelete?.();
-          setIsDeleteModalOpen(false); // Close modal after confirmation
-        }}
-        messageId={_id}
-      />
+      {onDelete && ( // Only render DeleteModal if onDelete is provided
+        <DeleteModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={() => {
+            onDelete();
+            setIsDeleteModalOpen(false);
+          }}
+          messageId={_id}
+        />
+      )}
     </>
   );
 };

@@ -22,7 +22,7 @@ interface ChatListProps {
   onEditStart?: (messageId: string, content: string) => void;
   onEditSave?: (messageId: string) => void;
   onEditCancel?: () => void;
-  onDelete?: (messageId: string) => void;
+  onDelete?: (messageId: string) => void; // Optional, only provided for admins
 }
 
 const ChatList = forwardRef<HTMLDivElement, ChatListProps>(
@@ -64,10 +64,14 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(
                 ? () => onEditStart(message._id, message.content)
                 : undefined
             }
-            onDelete={message.isSelf && onDelete ? () => {
-              console.log('onDelete triggered for message:', message._id); // Add this
-              onDelete(message._id);
-            } : undefined}
+            onDelete={
+              message.isSelf && onDelete // Only pass onDelete if it exists (admin case)
+                ? () => {
+                    console.log('onDelete triggered for message:', message._id); // Debugging
+                    onDelete(message._id);
+                  }
+                : undefined
+            }
           />
         ))}
       </div>
