@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { ReactNode } from 'react';
 
 interface ProtectedRouteProps {
@@ -8,10 +8,12 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children, adminRoute = false }: ProtectedRouteProps) => {
   const token = localStorage.getItem(adminRoute ? 'adminToken' : 'token');
-  const redirectPath = adminRoute ? '/admin/login' : '/login';
+  const location = useLocation();
+  const redirectPath = adminRoute ? '/admin/login' : '/'; // Redirect to landing page for login modal
 
   if (!token) {
-    return <Navigate to={redirectPath} replace />;
+    // If not authenticated, redirect to landing page with login modal
+    return <Navigate to={redirectPath} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

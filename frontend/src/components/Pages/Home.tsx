@@ -6,6 +6,7 @@ import ChatList from '../chat/ChatList';
 import ChatInput from '../chat/ChatInput';
 import ProfileModal from '../Modal/ProfileModal';
 import { useNotification } from '../../context/NotificationContext';
+import { openDB, DBSchema } from 'idb';
 
 interface Message {
   _id: string;
@@ -19,6 +20,42 @@ interface Message {
   isEdited?: boolean;
   isDeleted?: boolean;
 }
+
+// IndexedDB Schema
+interface ChatDB extends DBSchema {
+  messages: {
+    key: string;
+    value: Message;
+    indexes: { timestamp: string };
+  };
+}
+
+// IndexedDB Helper Functions
+const getDB = async () => {
+  return openDB<ChatDB>('chat-db', 1, {
+    upgrade(db) {
+      const store = db.createObjectStore('messages', { keyPath: '_id' });
+      store.createIndex('timestamp', 'timestamp');
+    },
+  });
+};
+
+const saveMessages = async (messages: Message[]) => {
+  const db = await getDB();
+  const tx = db.transaction('messages', 'readwrite');
+  const store = tx.objectStore('messages');
+  await Promise.all(messages.map((message) => store.put(message)));
+  await tx.done;
+};
+
+const getMessagesFromDB = async (): Promise<Message[]> => {
+  const db = await getDB();
+  const tx = db.transaction('messages', 'readonly');
+  const store = tx.objectStore('messages');
+  const index = store.index('timestamp');
+  const messages = await index.getAll();
+  return messages;
+};
 
 const Home = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -42,25 +79,40 @@ const Home = () => {
   const handleNewMessage = useCallback((message: Message) => {
     setMessages((prev) => {
       if (prev.some((m) => m._id === message._id)) return prev;
-      return [...prev, { ...message, isSelf: message.senderId === userId.current }];
+      const newMessages = [...prev, { ...message, isSelf: message.senderId === userId.current }];
+      saveMessages(newMessages); // Save to IndexedDB
+      return newMessages;
     });
     scrollToBottom();
   }, [scrollToBottom]);
 
   const handleMessageDelivered = useCallback((message: Message) => {
-    setMessages((prev) =>
-      prev.map((msg) =>
+    setMessages((prev: any) => {
+      const updatedMessages = prev.map((msg: any) =>
         msg._id === message._id
           ? { ...message, status: 'delivered', isSelf: message.senderId === userId.current }
           : msg
-      )
-    );
+      );
+      saveMessages(updatedMessages); // Update IndexedDB
+      return updatedMessages;
+    });
   }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       navigate('/');
+      return;
+    }
+
+    // Check if offline and load cached chat history from IndexedDB
+    if (!navigator.onLine) {
+      getMessagesFromDB().then((cachedMessages) => {
+        setMessages(cachedMessages);
+        setTimeout(scrollToBottom, 0);
+      }).catch((error) => {
+        console.error('Error loading messages from IndexedDB:', error);
+      });
       return;
     }
 
@@ -95,6 +147,7 @@ const Home = () => {
         .sort((a, b) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
       setMessages(formattedMessages);
+      saveMessages(formattedMessages); // Save to IndexedDB
       setTimeout(scrollToBottom, 0);
     });
 
@@ -107,17 +160,21 @@ const Home = () => {
     });
 
     socketRef.current.on('messageEdited', (updatedMessage: { _id: string; content: string; isEdited: boolean }) => {
-      setMessages((prev) =>
-        prev.map((msg) =>
+      setMessages((prev) => {
+        const updatedMessages = prev.map((msg) =>
           msg._id === updatedMessage._id ? { ...msg, content: updatedMessage.content, isEdited: true } : msg
-        )
-      );
+        );
+        saveMessages(updatedMessages); // Update IndexedDB
+        return updatedMessages;
+      });
     });
 
     socketRef.current.on('messageDeleted', ({ messageId }: { messageId: string }) => {
-      setMessages((prev) =>
-        prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
-      );
+      setMessages((prev) => {
+        const updatedMessages = prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg));
+        saveMessages(updatedMessages); // Update IndexedDB
+        return updatedMessages;
+      });
     });
 
     socketRef.current.on('connect_error', (error: any) => {
@@ -146,13 +203,29 @@ const Home = () => {
         messageType,
         status: 'sending',
         senderId: userId.current,
-        duration:messageType === 'voice' ? duration : undefined,
+        duration: messageType === 'voice' ? duration : undefined,
         timestamp: tempTimestamp,
       };
 
       pendingMessages.current.add(tempId);
-      setMessages((prev) => [...prev, tempMessage]);
+      setMessages((prev) => {
+        const newMessages = [...prev, tempMessage];
+        saveMessages(newMessages); // Save to IndexedDB
+        return newMessages;
+      });
       scrollToBottom();
+
+      if (!navigator.onLine) {
+        setMessages((prev: any) => {
+          const updatedMessages = prev.map((msg: any) =>
+            msg._id === tempId ? { ...msg, status: 'failed' } : msg
+          );
+          saveMessages(updatedMessages); // Update IndexedDB
+          return updatedMessages;
+        });
+        pendingMessages.current.delete(tempId);
+        return;
+      }
 
       let finalContent: string | ArrayBuffer = content as string;
       if (messageType === 'image' || messageType === 'voice') {
@@ -170,17 +243,23 @@ const Home = () => {
         },
         (ack: { status: string; message?: Message; error?: string }) => {
           if (ack.status === 'success' && ack.message) {
-            setMessages((prev:any) =>
-              prev .map((msg:any) =>
+            setMessages((prev: any) => {
+              const updatedMessages = prev.map((msg: any) =>
                 msg._id === tempId ? { ...ack.message, isSelf: true, status: 'delivered' } : msg
-              )
-            );
+              );
+              saveMessages(updatedMessages); // Update IndexedDB
+              return updatedMessages;
+            });
             pendingMessages.current.delete(tempId);
           } else {
             console.error('Failed to send message:', ack.error);
-            setMessages((prev) =>
-              prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
-            );
+            setMessages((prev: any) => {
+              const updatedMessages = prev.map((msg: any) =>
+                msg._id === tempId ? { ...msg, status: 'failed' } : msg
+              );
+              saveMessages(updatedMessages); // Update IndexedDB
+              return updatedMessages;
+            });
             pendingMessages.current.delete(tempId);
           }
         }
@@ -195,24 +274,38 @@ const Home = () => {
   };
 
   const handleEditSave = (messageId: string) => {
+    if (!navigator.onLine) {
+      // Offline: Update locally only
+      setMessages((prev) => {
+        const updatedMessages = prev.map((msg) =>
+          msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
+        );
+        saveMessages(updatedMessages); // Update IndexedDB
+        return updatedMessages;
+      });
+      setEditingMessageId(null);
+      setEditedContent('');
+      return;
+    }
+
     socketRef.current?.emit(
       'editMessage',
       { messageId, content: editedContent },
       (ack: { status: string }) => {
         if (ack.status === 'success') {
-          setMessages((prev) =>
-            prev.map((msg) =>
+          setMessages((prev) => {
+            const updatedMessages = prev.map((msg) =>
               msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
-            )
-          );
+            );
+            saveMessages(updatedMessages); // Update IndexedDB
+            return updatedMessages;
+          });
           setEditingMessageId(null);
           setEditedContent('');
         }
       }
     );
   };
-
-   
 
   return (
     <div className="flex flex-col h-screen bg-black font-serif">
@@ -234,7 +327,6 @@ const Home = () => {
                 onEditStart={handleEditStart}
                 onEditSave={handleEditSave}
                 onEditCancel={() => setEditingMessageId(null)}
-                
               />
             </div>
             <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2 z-50">

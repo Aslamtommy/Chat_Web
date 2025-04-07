@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Loader2, MessageSquare, Clock } from 'lucide-react';
 import adminService from '../Services/adminService';
+import { openDB, DBSchema } from 'idb';
 
 interface User {
   _id: string;
@@ -17,6 +18,38 @@ interface AdminSidebarProps {
   isMobile: boolean;
 }
 
+// IndexedDB Schema for Users
+interface UserDB extends DBSchema {
+  users: {
+    key: string;
+    value: User;
+    indexes: { 'by-username': string };
+  };
+}
+
+// IndexedDB Helper Functions
+const getDB = async () => {
+  return openDB<UserDB>('admin-users-db', 1, {
+    upgrade(db) {
+      const store = db.createObjectStore('users', { keyPath: '_id' });
+      store.createIndex('by-username', 'username');
+    },
+  });
+};
+
+const saveUsersToDB = async (users: User[]) => {
+  const db = await getDB();
+  const tx = db.transaction('users', 'readwrite');
+  const store = tx.objectStore('users');
+  await Promise.all(users.map((user) => store.put(user)));
+  await tx.done;
+};
+
+const getUsersFromDB = async (): Promise<User[]> => {
+  const db = await getDB();
+  return db.getAll('users');
+};
+
 const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminSidebarProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,7 +58,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   const previousSelectedUserId = useRef<string | null>(null);
   const debounceTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const socketConnected = useRef(false);
-  const hasFetchedInitialCounts = useRef(false); // Track if initial counts have been received
+  const hasFetchedInitialCounts = useRef(false);
 
   const debouncedSearch = useCallback((query: string) => {
     if (debounceTimeout.current) {
@@ -38,7 +71,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
 
   const sortUsersByTimestamp = useCallback((usersList: User[]) => {
     const sorted = usersList.sort((a, b) => {
-      if (!a.lastMessageTimestamp) return 1; // No timestamp -> bottom
+      if (!a.lastMessageTimestamp) return 1;
       if (!b.lastMessageTimestamp) return -1;
       return new Date(b.lastMessageTimestamp).getTime() - new Date(a.lastMessageTimestamp).getTime();
     });
@@ -50,18 +83,34 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     try {
       setIsLoading(true);
       setError(null);
+
+      if (!navigator.onLine) {
+        const cachedUsers = await getUsersFromDB();
+        if (cachedUsers.length > 0) {
+          setUsers(sortUsersByTimestamp(cachedUsers));
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const userList = await adminService.getAllUsers();
       const initialUsers = userList.map((user: any) => ({
         _id: user._id,
         username: user.username,
         lastMessageTimestamp: user.lastMessageTimestamp || null,
-        unreadCount: 0, // Will be updated by socket
+        unreadCount: 0,
       }));
       console.log('Fetched users:', initialUsers);
       setUsers(sortUsersByTimestamp(initialUsers));
+      await saveUsersToDB(initialUsers);
     } catch (err) {
       setError('Failed to load users');
       console.error('Error fetching users:', err);
+      const cachedUsers = await getUsersFromDB();
+      if (cachedUsers.length > 0) {
+        setUsers(sortUsersByTimestamp(cachedUsers));
+        setError(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -70,10 +119,13 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   useEffect(() => {
     fetchUserList();
 
+    if (!socket) return; // Guard against null socket
+
     const handleConnect = () => {
       console.log('Socket connected');
       socketConnected.current = true;
-      hasFetchedInitialCounts.current = false; // Reset on reconnect
+      hasFetchedInitialCounts.current = false;
+      socket.emit('syncUnreadCounts');
     };
 
     const handleDisconnect = () => {
@@ -88,7 +140,8 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
           ...user,
           unreadCount: unreadCounts[user._id] || 0,
         }));
-        hasFetchedInitialCounts.current = true; // Mark as received
+        hasFetchedInitialCounts.current = true;
+        saveUsersToDB(updatedUsers);
         return sortUsersByTimestamp(updatedUsers);
       });
     };
@@ -101,6 +154,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
             ? { ...user, unreadCount }
             : user
         );
+        saveUsersToDB(updatedUsers);
         return sortUsersByTimestamp(updatedUsers);
       });
     };
@@ -113,6 +167,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
             ? { ...user, lastMessageTimestamp: timestamp }
             : user
         );
+        saveUsersToDB(updatedUsers);
         return sortUsersByTimestamp(updatedUsers);
       });
     };
@@ -158,12 +213,14 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   const handleUserClick = async (userId: string) => {
     try {
       const user = users.find((u) => u._id === userId);
-      if (user?.unreadCount && user.unreadCount > 0) {
+      if (user?.unreadCount && user.unreadCount > 0 && socket) {
         await adminService.markMessagesAsRead(userId);
         socket.emit('markMessagesAsRead', { chatId: userId });
-        setUsers((prev) =>
-          prev.map((u) => (u._id === userId ? { ...u, unreadCount: 0 } : u))
-        );
+        setUsers((prev) => {
+          const updatedUsers = prev.map((u) => (u._id === userId ? { ...u, unreadCount: 0 } : u));
+          saveUsersToDB(updatedUsers);
+          return updatedUsers;
+        });
       }
       onSelectUser(userId);
     } catch (error) {
@@ -190,7 +247,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       </div>
 
       <div className="p-4 space-y-2">
-        {isLoading && !hasFetchedInitialCounts.current ? (
+        {isLoading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
           </div>

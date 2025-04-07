@@ -1,0 +1,22 @@
+{
+    "name": "Arabic Jyothisham",
+    "short_name": "Jyothisham",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#000000",
+    "description": "Arabic Jyothisham Progressive Web App",
+    "icons": [
+      {
+        "src": "/icon-128x128.png",
+        "sizes": "128x128",
+        "type": "image/png"
+      },
+      {
+        "src": "/icon-512x512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ],
+    "orientation": "portrait"
+  }

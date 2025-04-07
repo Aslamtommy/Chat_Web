@@ -13,7 +13,7 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    navigate('/login');
+    navigate('/');
   };
 
   // Animation variants for buttons

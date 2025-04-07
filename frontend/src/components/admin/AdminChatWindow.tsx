@@ -7,6 +7,7 @@ import { DollarSign, X, Check, User, ArrowLeft, Image } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 import chatService from '../Services/chatService';
 import axios from 'axios';
+import { openDB, DBSchema,   } from 'idb';
 
 interface Message {
   _id: string;
@@ -46,6 +47,45 @@ interface AdminChatWindowProps {
   isMobile: boolean;
   onBack?: () => void;
 }
+
+// IndexedDB Schema
+interface ChatDB extends DBSchema {
+  messages: {
+    key: string;
+    value: Message & { userId: string }; // Add userId to differentiate chats
+    indexes: { 'timestamp-userId': [string, string] };
+  };
+}
+
+// IndexedDB Helper Functions
+const getDB = async () => {
+  return openDB<ChatDB>('admin-chat-db', 1, {
+    upgrade(db) {
+      const store = db.createObjectStore('messages', { keyPath: '_id' });
+      store.createIndex('timestamp-userId', ['timestamp', 'userId']);
+    },
+  });
+};
+
+const saveMessages = async (userId: string, messages: Message[]) => {
+  const db = await getDB();
+  const tx = db.transaction('messages', 'readwrite');
+  const store = tx.objectStore('messages');
+  await Promise.all(messages.map((message) => store.put({ ...message, userId })));
+  await tx.done;
+};
+
+const getMessagesFromDB = async (userId: string): Promise<Message[]> => {
+  const db = await getDB();
+  const tx = db.transaction('messages', 'readonly');
+  const store = tx.objectStore('messages');
+  const index = store.index('timestamp-userId');
+  const messages = await index.getAll(IDBKeyRange.bound(['', userId], ['￿', userId]));
+  return messages.map((msg) => ({
+    ...msg,
+    userId: undefined, // Remove userId from the returned message
+  }));
+};
 
 const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -111,6 +151,14 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
 
     const fetchChatHistory = async () => {
       try {
+        if (!navigator.onLine) {
+          // Load from IndexedDB if offline
+          const cachedMessages = await getMessagesFromDB(userId);
+          setMessages(cachedMessages);
+          setTimeout(() => scrollToBottom(), 100);
+          return;
+        }
+
         const chat = await adminService.getUserChatHistory(userId);
         const formattedMessages: Message[] = chat.messages
           .map((msg: any) => {
@@ -133,6 +181,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           .sort((a: any, b: any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
         setMessages(formattedMessages);
+        saveMessages(userId, formattedMessages); // Save to IndexedDB
         setTimeout(() => scrollToBottom(), 100);
         markMessagesAsRead();
       } catch (error) {
@@ -147,10 +196,11 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     const handleNewMessage = (message: Message) => {
       if (message.chatId === userId || message.senderId === userId) {
         const isAdminMessage = message.senderId === adminId.current;
-        setMessages((prev) => [
-          ...prev,
-          { ...message, status: 'delivered' as const, isSelf: isAdminMessage },
-        ]);
+        setMessages((prev) => {
+          const newMessages = [...prev, { ...message, status: 'delivered' as const, isSelf: isAdminMessage }];
+          saveMessages(userId, newMessages); // Update IndexedDB
+          return newMessages;
+        });
         setTimeout(() => scrollToBottom(), 100);
         if (!isAdminMessage) markMessagesAsRead();
       }
@@ -170,18 +220,22 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
 
     const handleMessageEdited = (updatedMessage: { _id: string; content: string; isEdited: boolean }) => {
-      setMessages((prev) =>
-        prev.map((msg) =>
+      setMessages((prev) => {
+        const updatedMessages = prev.map((msg) =>
           msg._id === updatedMessage._id ? { ...msg, content: updatedMessage.content, isEdited: true } : msg
-        )
-      );
+        );
+        saveMessages(userId, updatedMessages); // Update IndexedDB
+        return updatedMessages;
+      });
     };
 
     const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
       console.log('Admin received messageDeleted for messageId:', messageId);
-      setMessages((prev) =>
-        prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
-      );
+      setMessages((prev) => {
+        const updatedMessages = prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg));
+        saveMessages(userId, updatedMessages); // Update IndexedDB
+        return updatedMessages;
+      });
     };
 
     socket.on('newMessage', handleNewMessage);
@@ -246,7 +300,11 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         duration: messageType === 'voice' ? duration : undefined,
         timestamp: tempTimestamp,
       };
-      setMessages((prev) => [...prev, tempMessage]);
+      setMessages((prev) => {
+        const newMessages = [...prev, tempMessage];
+        saveMessages(userId, newMessages); // Save to IndexedDB
+        return newMessages;
+      });
       setTimeout(() => scrollToBottom(), 100);
 
       try {
@@ -273,8 +331,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           if (response.status === 'success') {
             const savedMessage = response.message;
             console.log('Message sent successfully:', savedMessage);
-            setMessages((prev) =>
-              prev.map((msg) =>
+            setMessages((prev) => {
+              const updatedMessages = prev.map((msg) =>
                 msg._id === tempId
                   ? {
                       ...msg,
@@ -284,8 +342,10 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                       timestamp: savedMessage.timestamp,
                     }
                   : msg
-              )
-            );
+              );
+              saveMessages(userId, updatedMessages); // Update IndexedDB
+              return updatedMessages;
+            });
             socket.emit('updateUserOrder', {
               userId: userId,
               timestamp: savedMessage.timestamp,
@@ -293,16 +353,20 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             setTimeout(() => scrollToBottom(), 100);
           } else {
             console.error('Failed to send message via socket:', response);
-            setMessages((prev) =>
-              prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
-            );
+            setMessages((prev:any) => {
+              const updatedMessages = prev.map((msg:any) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg));
+              saveMessages(userId, updatedMessages); // Update IndexedDB
+              return updatedMessages;
+            });
           }
         });
       } catch (error) {
         console.error('Error sending message:', error);
-        setMessages((prev) =>
-          prev.map((msg) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg))
-        );
+        setMessages((prev:any) => {
+          const updatedMessages = prev.map((msg:any) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg));
+          saveMessages(userId, updatedMessages); // Update IndexedDB
+          return updatedMessages;
+        });
       }
     },
     [userId, socket]
@@ -318,11 +382,13 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       .editMessageAdmin(messageId, editedContent)
       .then(() => {
         socket.emit('editMessage', { messageId, content: editedContent });
-        setMessages((prev) =>
-          prev.map((msg) =>
+        setMessages((prev) => {
+          const updatedMessages = prev.map((msg) =>
             msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
-          )
-        );
+          );
+          if (userId) saveMessages(userId, updatedMessages); // Update IndexedDB
+          return updatedMessages;
+        });
         setEditingMessageId(null);
         setEditedContent('');
       })
@@ -334,9 +400,11 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     socket.emit('deleteMessage', { messageId }, (response: { status: string }) => {
       if (response.status === 'success') {
         console.log('Message deleted successfully via socket, updating state:', messageId);
-        setMessages((prev) =>
-          prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg))
-        );
+        setMessages((prev) => {
+          const updatedMessages = prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg));
+          if (userId) saveMessages(userId, updatedMessages); // Update IndexedDB
+          return updatedMessages;
+        });
       } else {
         console.error('Socket deletion failed:', response);
       }

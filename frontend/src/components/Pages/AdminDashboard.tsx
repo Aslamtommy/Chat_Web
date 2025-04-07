@@ -47,7 +47,7 @@ const AdminDashboard = () => {
       });
       socketRef.current.on('reconnect', () => {
         console.log('Admin socket reconnected');
-        socketRef.current.emit('syncUnreadCounts'); // Emit on reconnect
+        socketRef.current.emit('syncUnreadCounts');
       });
 
       socketRef.current.on('connect_error', (error: any) => {
@@ -107,32 +107,29 @@ const AdminDashboard = () => {
         hideOnMobile={isMobileView && selectedUserId !== null}
       />
       <div className="flex flex-1 overflow-hidden">
-        {isSocketConnected && socketRef.current ? (
-          <>
-            {/* Show sidebar if no user is selected or if not in mobile view */}
-            {(!isMobileView || selectedUserId === null) && (
-              <AdminSidebar
-                onSelectUser={handleSelectUser}
-                selectedUserId={selectedUserId}
-                socket={socketRef.current}
-                isMobile={isMobileView}
-              />
-            )}
-            {/* Show chat window only if a user is selected or if not in mobile view */}
-            {(!isMobileView || selectedUserId !== null) && (
-              <div className="flex-1 flex flex-col">
-                <AdminChatWindow
-                  userId={selectedUserId}
-                  username={selectedUserName}
-                  socket={socketRef.current}
-                  isMobile={isMobileView}
-                  onBack={handleBackToUsers}
-                />
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
+        {/* Always render AdminSidebar, regardless of socket connection */}
+        {(!isMobileView || selectedUserId === null) && (
+          <AdminSidebar
+            onSelectUser={handleSelectUser}
+            selectedUserId={selectedUserId}
+            socket={socketRef.current}
+            isMobile={isMobileView}
+          />
+        )}
+        {/* Render AdminChatWindow based on selection or desktop view */}
+        {(!isMobileView || selectedUserId !== null) && (
+          <div className="flex-1 flex flex-col">
+            <AdminChatWindow
+              userId={selectedUserId}
+              username={selectedUserName}
+              socket={socketRef.current}
+              isMobile={isMobileView}
+              onBack={handleBackToUsers}
+            />
+          </div>
+        )}
+        {!isSocketConnected && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
             <p className="text-white/70 text-lg">Connecting to server...</p>
           </div>
         )}

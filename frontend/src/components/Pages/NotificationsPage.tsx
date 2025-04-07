@@ -144,6 +144,15 @@ const NotificationsPage = () => {
     }
   };
 
+  const handleBack = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/');
+      return;
+    }
+    navigate('/home');
+  };
+
   return (
     <>
       <div className="flex flex-col min-h-screen bg-gradient-to-b from-black to-gray-900 font-serif">
@@ -154,7 +163,7 @@ const NotificationsPage = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/home')}
+                onClick={handleBack}
                 className="mr-3 sm:mr-4 p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />

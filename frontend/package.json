@@ -24,6 +24,7 @@
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "framer-motion": "^11.18.2",
+    "idb": "^8.0.2",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.483.0",
     "mongoose": "^8.12.2",
