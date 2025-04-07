@@ -61,7 +61,7 @@ const NotificationsPage = () => {
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
-  const [selectedPaymentDetails, setSelectedPaymentDetails] = useState<PaymentRequest['paymentDetails'] | null>(null);
+  
   const { setUnreadCount }:any = useNotification();
   const navigate = useNavigate();
 

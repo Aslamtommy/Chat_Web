@@ -21,7 +21,7 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
     initial: { scale: 1, translateZ: 0, boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)' },
     hover: {
       scale: 1.1,
-      translateZ: 10, // Moves forward in 3D space
+      translateZ: 10,
       boxShadow: '0px 6px 12px rgba(0, 0, 0, 0.3)',
       transition: { duration: 0.3, ease: 'easeOut' },
     },
@@ -50,7 +50,7 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
           </h2>
         </div>
 
-        {/* Actions: Notification, Profile, and Logout */}
+        {/* Actions: Notification, Profile, Contact Us, Terms, Logout */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Notification Button */}
           <motion.button
@@ -60,7 +60,7 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             whileTap="tap"
             onClick={() => navigate('/notifications')}
             className="relative flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
-            style={{ transformStyle: 'preserve-3d' }} // Enable 3D transforms
+            style={{ transformStyle: 'preserve-3d' }}
           >
             <Bell className="w-5 h-5 group-hover:stroke-amber-500" />
             {unreadCount > 0 && (
@@ -79,10 +79,36 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             whileTap="tap"
             onClick={onProfileClick}
             className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
-            style={{ transformStyle: 'preserve-3d' }} // Enable 3D transforms
+            style={{ transformStyle: 'preserve-3d' }}
           >
             <User className="w-5 h-5 group-hover:stroke-amber-500" />
             <span className="text-sm font-medium hidden sm:inline">Profile</span>
+          </motion.button>
+
+          {/* Contact Us Button */}
+          <motion.button
+            variants={buttonVariants}
+            initial="initial"
+            whileHover="hover"
+            whileTap="tap"
+            onClick={() => navigate('/contact-us')}
+            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
+            style={{ transformStyle: 'preserve-3d' }}
+          >
+            <span className="text-sm font-medium hidden sm:inline">Contact Us</span>
+          </motion.button>
+
+          {/* Terms & Conditions Button */}
+          <motion.button
+            variants={buttonVariants}
+            initial="initial"
+            whileHover="hover"
+            whileTap="tap"
+            onClick={() => navigate('/terms-and-conditions')}
+            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
+            style={{ transformStyle: 'preserve-3d' }}
+          >
+            <span className="text-sm font-medium hidden sm:inline">Terms</span>
           </motion.button>
 
           {/* Logout Button */}
@@ -93,7 +119,7 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             whileTap="tap"
             onClick={handleLogout}
             className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
-            style={{ transformStyle: 'preserve-3d' }} // Enable 3D transforms
+            style={{ transformStyle: 'preserve-3d' }}
           >
             <LogOut className="w-5 h-5 group-hover:stroke-amber-500" />
             <span className="text-sm font-medium hidden sm:inline">Logout</span>
