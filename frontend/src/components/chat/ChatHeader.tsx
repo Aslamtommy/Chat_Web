@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, MessageSquareText, User, Bell } from 'lucide-react';
+import { LogOut, MessageSquareText, User, Bell, Mail, FileText } from 'lucide-react'; // Added Mail and FileText icons
 import { motion } from 'framer-motion';
 import { useNotification } from '../../context/NotificationContext';
 
@@ -59,12 +59,12 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             whileHover="hover"
             whileTap="tap"
             onClick={() => navigate('/notifications')}
-            className="relative flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
+            className="relative flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-2 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
             style={{ transformStyle: 'preserve-3d' }}
           >
             <Bell className="w-5 h-5 group-hover:stroke-amber-500" />
             {unreadCount > 0 && (
-              <span className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs">
                 {unreadCount}
               </span>
             )}
@@ -78,7 +78,7 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             whileHover="hover"
             whileTap="tap"
             onClick={onProfileClick}
-            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
+            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-2 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
             style={{ transformStyle: 'preserve-3d' }}
           >
             <User className="w-5 h-5 group-hover:stroke-amber-500" />
@@ -92,9 +92,10 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             whileHover="hover"
             whileTap="tap"
             onClick={() => navigate('/contact-us')}
-            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
+            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-2 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
             style={{ transformStyle: 'preserve-3d' }}
           >
+            <Mail className="w-5 h-5 group-hover:stroke-amber-500" /> {/* Added Mail icon */}
             <span className="text-sm font-medium hidden sm:inline">Contact Us</span>
           </motion.button>
 
@@ -105,9 +106,10 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             whileHover="hover"
             whileTap="tap"
             onClick={() => navigate('/terms-and-conditions')}
-            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
+            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-2 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
             style={{ transformStyle: 'preserve-3d' }}
           >
+            <FileText className="w-5 h-5 group-hover:stroke-amber-500" /> {/* Added FileText icon */}
             <span className="text-sm font-medium hidden sm:inline">Terms</span>
           </motion.button>
 
@@ -118,7 +120,7 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             whileHover="hover"
             whileTap="tap"
             onClick={handleLogout}
-            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-3 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
+            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-2 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
             style={{ transformStyle: 'preserve-3d' }}
           >
             <LogOut className="w-5 h-5 group-hover:stroke-amber-500" />
