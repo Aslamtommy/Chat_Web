@@ -178,6 +178,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             };
           })
           .filter((msg: any): msg is Message => msg !== null)
+          .filter((msg:any) => !msg.isDeleted) // Filter out deleted messages initially
           .sort((a: any, b: any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
         setMessages(formattedMessages);
@@ -399,10 +400,10 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     console.log('handleDelete called in AdminChatWindow for messageId:', messageId);
     socket.emit('deleteMessage', { messageId }, (response: { status: string }) => {
       if (response.status === 'success') {
-        console.log('Message deleted successfully via socket, updating state:', messageId);
+        console.log('Message deleted successfully via socket, removing from state:', messageId);
         setMessages((prev) => {
-          const updatedMessages = prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg));
-          if (userId) saveMessages(userId, updatedMessages); // Update IndexedDB
+          const updatedMessages = prev.filter((msg) => msg._id !== messageId); // Remove the message entirely
+          if (userId) saveMessages(userId, updatedMessages);
           return updatedMessages;
         });
       } else {
@@ -417,13 +418,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   };
 
   const isPaymentDetailsValid = () => {
-    return (
-      paymentDetails.accountNumber.trim() &&
-      paymentDetails.ifscCode.trim() &&
-      paymentDetails.amount.trim() &&
-      paymentDetails.name.trim() &&
-      paymentDetails.upiId.trim()
-    );
+    return  true
   };
 
   return (
