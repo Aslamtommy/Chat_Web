@@ -1,9 +1,10 @@
-// Register.jsx
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
 import authService from '../Services/authService';
 import { FaUser, FaEnvelope, FaLock, FaBirthdayCake, FaUserFriends, FaPhone, FaMapMarkerAlt } from 'react-icons/fa';
 import toast from 'react-hot-toast';
+
+declare const Cashfree: any;
 
 interface RegisterForm {
   username: string;
@@ -17,38 +18,77 @@ interface RegisterForm {
   district: string;
 }
 
-interface RegisterProps {
-  onSuccess?: () => void;
-}
-
-const Register = ({ onSuccess }: RegisterProps) => {
+const Register = () => {
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<RegisterForm>();
 
-  const onSubmit = async (data: RegisterForm) => {
+  const sanitizeCustomerId = (email: string): string => {
+    return email.replace(/[^a-zA-Z0-9_-]/g, '');
+  };
+
+  const initiatePayment = async (data: RegisterForm) => {
     try {
-      await authService.register(data);
-      toast.success('Registration successful! Please login to continue.', {
+      const sanitizedCustomerId = sanitizeCustomerId(data.email);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: 500,
+          currency: 'INR',
+          customer_id: sanitizedCustomerId,
+          customer_email: data.email,
+          customer_phone: data.phoneNo,
+          customer_name: data.username,
+          return_url: `${window.location.origin}/payment-success?userData=${encodeURIComponent(JSON.stringify(data))}`,
+        }),
+      });
+
+      const orderData = await response.json();
+      console.log('Order Response:', orderData);
+      if (!orderData.success || !orderData.data.payment_session_id) {
+        throw new Error(orderData.error || 'Failed to create payment order');
+      }
+
+      const cashfree = new Cashfree({
+        mode: import.meta.env.VITE_CASHFREE_ENV || 'sandbox',
+      });
+      console.log('Cashfree SDK initialized:', cashfree);
+      cashfree.checkout({
+        paymentSessionId: orderData.data.payment_session_id,
+        redirectTarget: '_self',
+      });
+    } catch (error) {
+      console.error('Payment initiation error:', error);
+      toast.error('Failed to initiate payment: ' + (error as Error).message, {
         duration: 4000,
         position: 'top-center',
-        style: {
-          background: '#333',
-          color: '#fff',
-        },
+        style: { background: '#333', color: '#fff' },
       });
-      onSuccess?.();
+    }
+  };
+
+  const onSubmit = async (data: RegisterForm) => {
+    try {
+      const response = await authService.register(data);
+      if (!response.success) {
+        throw new Error(response.error || 'Registration validation failed');
+      }
+      toast.success('Registration validated! Proceeding to payment...', {
+        duration: 4000,
+        position: 'top-center',
+        style: { background: '#333', color: '#fff' },
+      });
+      await initiatePayment(data); // Proceed to payment directly
     } catch (error) {
+      console.error('Registration error:', error);
       const errorMessage = (error as Error).message;
       toast.error(errorMessage, {
         duration: 4000,
         position: 'top-center',
-        style: {
-          background: '#333',
-          color: '#fff',
-        },
+        style: { background: '#333', color: '#fff' },
       });
     }
   };
@@ -62,7 +102,7 @@ const Register = ({ onSuccess }: RegisterProps) => {
     { name: 'mothersName' as const, placeholder: "Mother's Name", icon: FaUserFriends, validation: { required: "Mother's name is required" } },
     { name: 'phoneNo' as const, placeholder: 'Phone Number', icon: FaPhone, validation: { required: 'Phone number is required', pattern: { value: /^\d{10}$/, message: 'Phone number must be 10 digits' } } },
     { name: 'place' as const, placeholder: 'Place', icon: FaMapMarkerAlt, validation: { required: 'Place is required' } },
-    { name: 'district' as const, placeholder: 'District', icon: FaMapMarkerAlt, validation: { required: 'District is required' } }
+    { name: 'district' as const, placeholder: 'District', icon: FaMapMarkerAlt, validation: { required: 'District is required' } },
   ];
 
   return (
@@ -97,7 +137,7 @@ const Register = ({ onSuccess }: RegisterProps) => {
         whileTap={{ scale: 0.98 }}
         className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-white py-3 rounded-lg font-medium hover:from-amber-600 hover:to-amber-700 transition-all duration-300 shadow-lg shadow-amber-500/20"
       >
-        {isSubmitting ? 'Creating Account...' : 'Create Account'}
+        {isSubmitting ? 'Processing...' : 'Register & Pay'}
       </motion.button>
     </motion.form>
   );

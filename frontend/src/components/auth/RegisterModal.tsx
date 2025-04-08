@@ -8,12 +8,9 @@ interface RegisterModalProps {
   onRegisterSuccess?: () => void; // Added prop to handle successful registration
 }
 
-const RegisterModal = ({ isOpen, onClose, onRegisterSuccess }: RegisterModalProps) => {
+const RegisterModal = ({ isOpen, onClose  }: RegisterModalProps) => {
   // Handler to close modal and trigger success callback
-  const handleRegisterSuccess = () => {
-    onClose(); // Close the register modal
-    onRegisterSuccess?.(); // Trigger the success callback to open login modal
-  };
+ 
 
   return (
     <AnimatePresence>
@@ -74,7 +71,7 @@ const RegisterModal = ({ isOpen, onClose, onRegisterSuccess }: RegisterModalProp
 
                 {/* Register Form */}
                 <div className="px-3 pb-4 sm:px-6 sm:pb-6 overflow-y-auto flex-1">
-                  <Register onSuccess={handleRegisterSuccess} />
+                  <Register   />
                 </div>
               </div>
             </div>

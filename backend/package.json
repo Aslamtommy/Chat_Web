@@ -23,6 +23,7 @@
     "@types/socket.io": "^3.0.1",
     "@vercel/node": "^5.1.14",
     "aws-sdk": "^2.1692.0",
+    "axios": "^1.8.4",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.6.0",
     "cors": "^2.8.5",

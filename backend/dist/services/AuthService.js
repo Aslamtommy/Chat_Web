@@ -99,5 +99,10 @@ class AuthService {
         const { password, ...userWithoutPassword } = updatedUser.toObject();
         return userWithoutPassword;
     }
+    async findByEmail(email) {
+        const user = await UserRepository_1.default.findByEmail(email);
+        console.log('findByEmail result for', email, ':', user); // Debug log
+        return user;
+    }
 }
 exports.default = new AuthService();

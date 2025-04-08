@@ -16,7 +16,7 @@ const userSchema = new Schema<IUser>({
 });
 
 // Add indexes for frequently queried fields
-userSchema.index({ email: 1 });
+ 
 userSchema.index({ role: 1 });
 userSchema.index({ username: 1 });
 

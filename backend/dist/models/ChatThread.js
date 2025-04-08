@@ -7,6 +7,9 @@ const messageSchema = new mongoose_1.Schema({
     content: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
     read_by_admin: { type: Boolean, default: false }, // Default is false
+    isEdited: { type: Boolean, default: false }, // New field for edit tracking
+    isDeleted: { type: Boolean, default: false }, // New field for soft deletion
+    duration: { type: Number }, // Add this line
 });
 // Add index for faster message queries
 messageSchema.index({ timestamp: 1 });

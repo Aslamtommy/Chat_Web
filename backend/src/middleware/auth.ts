@@ -1,17 +1,30 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-export default (req: Request, res: Response, next: NextFunction): Response | void => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+// Extend Request to include user property
+interface AuthenticatedRequest extends Request {
+  user?: { id: string; role: string };
+}
 
- 
-  if (!token) return res.status(401).json({ error: 'No token provided' });
+const authMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction): Response | void => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  console.log('Token received in middleware:', token); // Debug
+
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'No token provided' });
+  }
 
   try {
-    const decoded = jwt.verify(token, 'mysecret') as { id: string; role: string };
+    const secret = process.env.JWT_SECRET || 'mysecret';
+    console.log('JWT_SECRET used:', secret); // Debug to confirm secret
+    const decoded = jwt.verify(token, secret) as { id: string; role: string };
+    console.log('Decoded token:', decoded); // Debug decoded payload
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    console.error('Token verification error:', error);
+    return res.status(401).json({ success: false, error: 'Invalid token' });
   }
 };
+
+export default authMiddleware;

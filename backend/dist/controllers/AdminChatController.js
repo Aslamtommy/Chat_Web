@@ -69,7 +69,7 @@ class AdminChatController {
         try {
             const userId = req.params.userId;
             const senderId = req.user.id;
-            const { messageType } = req.body;
+            const { messageType, duration } = req.body;
             let content;
             if (!messageType)
                 throw new Error('messageType is required');
@@ -86,7 +86,7 @@ class AdminChatController {
                     throw new Error('File is required for image or voice messages');
                 content = await StorageService_1.default.uploadFile(file, messageType === 'image' ? 'image' : 'audio');
             }
-            const updatedChat = await ChatService_1.default.saveMessage(userId, senderId, messageType, content);
+            const updatedChat = await ChatService_1.default.saveMessage(userId, senderId, messageType, content, duration);
             // Emit real-time update via Socket.io
             const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
             if (!newMessage || !newMessage._id) {

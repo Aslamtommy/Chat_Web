@@ -65,9 +65,13 @@ mongoose.connect(mongoUri)
 
 io.use((socket: Socket, next) => {
   const token = socket.handshake.auth.token;
+  console.log('Socket auth token:', token);
   if (!token) return next(new Error('Authentication error: No token provided'));
   try {
+    const secret = process.env.JWT_SECRET || 'mysecret';
+    console.log('Socket JWT_SECRET:', secret); // Debug
     const decoded = jwt.verify(token, 'mysecret') as { id: string; role: string };
+    console.log('Socket decoded token:', decoded);  
     socket.data.user = decoded;
     next();
   } catch (error) {

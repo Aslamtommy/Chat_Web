@@ -19,11 +19,12 @@ class ChatRepository {
         return chat.save();
     }
     async addMessage(userId, message) {
+        console.log(`[addMessage] Adding message for user: ${userId}, content: ${message.content}, timestamp: ${new Date().toISOString()}`);
         const updatedChat = await ChatThread_1.default.findOneAndUpdate({ user_id: userId }, {
             $push: { messages: message },
-            $set: { last_read_by_admin: null } // Reset last_read_by_admin when new message arrives
+            $set: { last_read_by_admin: null }
         }, { new: true, upsert: true }).lean();
-        // Invalidate cache for this user
+        console.log(`[addMessage] Message added for user: ${userId}, message ID: ${updatedChat.messages[updatedChat.messages.length - 1]._id}`);
         unreadCountsCache.delete(userId);
         return updatedChat;
     }
@@ -79,13 +80,38 @@ class ChatRepository {
         return unreadCounts;
     }
     async getUnreadCount(userId) {
+        console.log(`[getUnreadCount] Called for user: ${userId}, timestamp: ${new Date().toISOString()}`);
         const thread = await ChatThread_1.default.findOne({ user_id: userId })
             .select('messages')
             .lean();
-        if (!thread)
+        if (!thread) {
+            console.log(`[getUnreadCount] No thread found for user: ${userId}`);
             return 0;
-        // Count only messages from the user (sender_id matches userId) where read_by_admin is false
-        return thread.messages.filter(msg => msg.sender_id.toString() === userId && msg.read_by_admin === false).length;
+        }
+        const count = thread.messages.filter(msg => msg.sender_id.toString() === userId && msg.read_by_admin === false).length;
+        console.log(`[getUnreadCount] Unread count for user ${userId}: ${count}, messages: ${thread.messages.length}`);
+        return count;
+    }
+    async updateMessage(messageId, content) {
+        const chat = await ChatThread_1.default.findOneAndUpdate({ 'messages._id': messageId }, {
+            $set: {
+                'messages.$.content': content,
+                'messages.$.isEdited': true,
+            },
+        }, { new: true }).lean();
+        const updatedMessage = chat?.messages.find((msg) => msg._id.toString() === messageId);
+        if (!updatedMessage)
+            throw new Error('Message not found');
+        return updatedMessage;
+    }
+    async deleteMessage(messageId) {
+        const result = await ChatThread_1.default.updateOne({ 'messages._id': messageId }, {
+            $set: {
+                'messages.$.isDeleted': true,
+            },
+        });
+        if (result.modifiedCount === 0)
+            throw new Error('Message not found or already deleted');
     }
 }
 exports.default = new ChatRepository();

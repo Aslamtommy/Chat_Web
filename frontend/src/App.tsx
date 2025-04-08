@@ -12,6 +12,8 @@ import { NotificationProvider } from './context/NotificationContext';
 import NotificationsPage from './components/Pages/NotificationsPage';
 import ContactUs from './components/Pages/ContactUs';
 import TermsAndConditions from './components/Pages/TermsAndConditions';
+import PaymentSuccess from './components/auth/PaymentSuccess';
+import Login from './components/auth/Login';
 
 const AppContent = () => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -37,11 +39,9 @@ const AppContent = () => {
 
     const handlePopstate = () => {
       if (token && location.pathname === '/') {
-        // If authenticated and navigating back to '/', stay on /home
         window.history.pushState({}, '', '/home');
         navigate('/home', { replace: true });
       } else if (adminToken && location.pathname === '/') {
-        // For admin, redirect to dashboard if trying to go back to landing
         window.history.pushState({}, '', '/admin/dashboard');
         navigate('/admin/dashboard', { replace: true });
       }
@@ -49,21 +49,23 @@ const AppContent = () => {
 
     window.addEventListener('popstate', handlePopstate);
 
-    // Initial check to redirect authenticated users from landing page
-    if (token && location.pathname === '/') {
+    // Only redirect if not coming from payment-success
+    if (token && location.pathname === '/' && location.state?.from?.pathname !== '/payment-success') {
       navigate('/home', { replace: true });
-    } else if (adminToken && location.pathname === '/') {
+    } else if (adminToken && location.pathname === '/' && location.state?.from?.pathname !== '/payment-success') {
       navigate('/admin/dashboard', { replace: true });
     }
 
     return () => window.removeEventListener('popstate', handlePopstate);
-  }, [location.pathname, navigate]);
+  }, [location.pathname, location.state, navigate]);
 
   return (
     <>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route
           path="/home"
           element={

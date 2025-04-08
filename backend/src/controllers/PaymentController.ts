@@ -2,7 +2,11 @@ import { Request, Response } from 'express';
 import PaymentRequest from '../models/PaymentRequest';
 import StorageService from '../services/StorageService';
 import { io } from '../server';
-
+import axios from 'axios';
+const CASHFREE_APP_ID = process.env.CASHFREE_APP_ID;
+const CASHFREE_SECRET_KEY = process.env.CASHFREE_SECRET_KEY;
+const CASHFREE_ENV = process.env.CASHFREE_ENV || 'sandbox';
+const CASHFREE_API_URL = CASHFREE_ENV === 'sandbox' ? 'https://sandbox.cashfree.com/pg' : 'https://api.cashfree.com/pg';
 class PaymentController {
   async createPaymentRequest(req: Request, res: Response): Promise<void> {
     try {
@@ -83,6 +87,67 @@ async getAdminPaymentRequests(req: Request, res: Response): Promise<void> {
       res.status(200).json({ success: true, data: paymentRequests });
     } catch (error) {
       res.status(400).json({ success: false, error: (error as Error).message });
+    }
+  }
+
+  async createOrder(req: Request, res: Response): Promise<void> {
+    const { amount, currency, customer_id, customer_email, customer_phone, customer_name, return_url } = req.body;
+
+    const requiredFields = ['amount', 'currency', 'customer_id', 'customer_email', 'customer_phone', 'customer_name', 'return_url'];
+    const missingFields = requiredFields.filter(field => !req.body[field]);
+    if (missingFields.length > 0) {
+      res.status(400).json({ success: false, error: `Missing required fields: ${missingFields.join(', ')}` });
+      return;
+    }
+
+    if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
+      res.status(500).json({ success: false, error: 'Cashfree credentials not configured' });
+      return;
+    }
+
+    const orderData = {
+      order_amount: amount,
+      order_currency: currency,
+      customer_details: {
+        customer_id,
+        customer_email,
+        customer_phone,
+        customer_name,
+      },
+      order_meta: {
+        return_url,
+      },
+    };
+
+    try {
+      console.log('Creating Cashfree order with:', {
+        url: `${CASHFREE_API_URL}/orders`,
+        headers: {
+          'x-api-version': '2023-08-01',
+          'x-client-id': CASHFREE_APP_ID,
+          'x-client-secret': CASHFREE_SECRET_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: orderData,
+      });
+
+      const response = await axios.post(`${CASHFREE_API_URL}/orders`, orderData, {
+        headers: {
+          'x-api-version': '2023-08-01',
+          'x-client-id': CASHFREE_APP_ID,
+          'x-client-secret': CASHFREE_SECRET_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Cashfree order created successfully:', response.data);
+      res.json({ success: true, data: response.data });
+    } catch (error: any) {
+      console.error('Error creating Cashfree order:', error.response?.data || error.message);
+      res.status(500).json({ 
+        success: false, 
+        error: error.response?.data?.message || 'Failed to create payment order' 
+      });
     }
   }
 }

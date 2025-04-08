@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-const API_URL =  `${import.meta.env.VITE_API_URL}/auth`
-
+const API_URL = `${import.meta.env.VITE_API_URL}/auth`;
 
 interface ApiResponse<T> {
   success: boolean;
@@ -11,8 +10,7 @@ interface ApiResponse<T> {
 
 const handleApiError = (error: any): string => {
   if (error.response) {
-    console.log(error)
-    // Server responded with error
+    console.log(error);
     const errorMessage = error.response.data.error;
     switch (error.response.status) {
       case 400:
@@ -31,10 +29,8 @@ const handleApiError = (error: any): string => {
         return errorMessage || 'Something went wrong.';
     }
   } else if (error.request) {
-    // Request made but no response
     return 'Network error. Please check your connection.';
   } else {
-    // Something else went wrong
     return 'An unexpected error occurred.';
   }
 };

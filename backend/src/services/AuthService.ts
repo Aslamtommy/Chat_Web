@@ -145,6 +145,11 @@ class AuthService {
     const { password, ...userWithoutPassword } = updatedUser.toObject();
     return userWithoutPassword as IUser;
   }
+  async findByEmail(email: string): Promise<IUser | null> {
+    const user = await UserRepository.findByEmail(email);
+    console.log('findByEmail result for', email, ':', user); // Debug log
+    return user;
+  }
 }
 
 export default new AuthService();
