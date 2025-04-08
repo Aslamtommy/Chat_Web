@@ -73,7 +73,12 @@ const AdminDashboard = () => {
     };
   }, [navigate]);
 
-  const handleSelectUser = async (userId: string) => {
+  const handleSelectUser = async (userId: string | null) => {
+    if (userId === null) {
+      setSelectedUserId(null);
+      setSelectedUserName(null);
+      return;
+    }
     setSelectedUserId(userId);
     try {
       const user = await adminService.getUserById(userId);

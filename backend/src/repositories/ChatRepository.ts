@@ -142,6 +142,14 @@ class ChatRepository {
     );
     if (result.modifiedCount === 0) throw new Error('Message not found or already deleted');
   }
+
+  async deleteByUserId(userId: string): Promise<void> {
+    const result = await ChatThread.deleteOne({ user_id: userId });
+    if (result.deletedCount === 0) {
+      console.warn(`No chat thread found for user ${userId} to delete`);
+    }
+    unreadCountsCache.delete(userId); // Clear cache
+  }
 }
 
 export default new ChatRepository();

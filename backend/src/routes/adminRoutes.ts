@@ -20,4 +20,5 @@ router.get('/chats/unread-counts', authMiddleware as RequestHandler, adminRoleMi
 router.post('/chats/user/:userId/mark-read', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, validateUserId as RequestHandler, AdminChatController.markMessagesAsRead);
 router.post('/payment-request', authMiddleware as RequestHandler, PaymentController.createPaymentRequest);
 router.get('/payment-requests', authMiddleware as RequestHandler, PaymentController.getAdminPaymentRequests);
+router.delete('/users/:id', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, AdminAuthController.deleteUser); // Added DELETE route
 export default router;

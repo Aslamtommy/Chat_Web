@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader2, MessageSquare, Clock } from 'lucide-react';
+import { Search, Loader2, MessageSquare, Clock,Trash2  } from 'lucide-react';
 import adminService from '../Services/adminService';
 import { openDB, DBSchema } from 'idb';
 
@@ -12,7 +12,7 @@ interface User {
 }
 
 interface AdminSidebarProps {
-  onSelectUser: (userId: string) => void;
+  onSelectUser: (userId: string | null) => void;
   selectedUserId: string | null;
   socket: any;
   isMobile: boolean;
@@ -115,6 +115,22 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       setIsLoading(false);
     }
   }, [sortUsersByTimestamp]);
+
+  // Handle user deletion
+  const handleDeleteUser = async (userId: string) => {
+    if (window.confirm('Are you sure you want to delete this user and their chat history?')) {
+      try {
+        await adminService.deleteUser(userId); // Call the new deleteUser service
+        await fetchUserList(); // Refresh the user list
+        if (selectedUserId === userId) {
+          onSelectUser(null); // Deselect the user if they were selected
+        }
+      } catch (error) {
+        console.error('Failed to delete user:', error);
+        alert('Failed to delete user. Please try again.');
+      }
+    }
+  };
 
   useEffect(() => {
     fetchUserList();
@@ -300,21 +316,33 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
                     )}
                   </div>
                 </div>
-                {user.unreadCount > 0 && selectedUserId !== user._id && (
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center space-x-2">
-                    <MessageSquare className="w-4 h-4 text-amber-500" />
-                    <span className="w-6 h-6 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-lg shadow-amber-500/20">
-                      {user.unreadCount}
-                    </span>
-                  </motion.div>
-                )}
+                <div className="flex items-center space-x-2">
+                  {user.unreadCount > 0 && selectedUserId !== user._id && (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center space-x-1">
+                      <MessageSquare className="w-4 h-4 text-amber-500" />
+                      <span className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                        {user.unreadCount}
+                      </span>
+                    </motion.div>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent triggering user selection
+                      handleDeleteUser(user._id);
+                    }}
+                    className="text-red-500 hover:text-red-700 transition-colors p-1"
+                    title="Delete user"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
         )}
       </div>
     </div>
-  );
+  )
 };
 
 export default AdminSidebar;

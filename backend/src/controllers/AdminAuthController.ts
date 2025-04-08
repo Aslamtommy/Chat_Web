@@ -72,6 +72,33 @@ class AdminAuthController {
       res.status(500).json({ success: false, error: (error as Error).message });
     }
   }
+  async deleteUser(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.params.id;
+
+      // Check if the user exists and is not an admin
+      const user = await UserRepository.findById(userId);
+      if (!user) {
+        res.status(404).json({ success: false, error: 'User not found' });
+        return;
+      }
+      if (user.role === 'admin') {
+        res.status(403).json({ success: false, error: 'Cannot delete an admin user' });
+        return;
+      }
+
+      // Delete the user
+      await UserRepository.deleteById(userId);
+
+      // Delete the user's chat thread
+      await ChatRepository.deleteByUserId(userId);
+
+      res.json({ success: true, message: 'User and their chat history deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ success: false, error: (error as Error).message });
+    }
+  }
 }
 
 export default new AdminAuthController();

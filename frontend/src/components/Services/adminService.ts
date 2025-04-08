@@ -84,7 +84,15 @@ const adminService = {
     if (!response.data.success) throw new Error(response.data.error || 'Failed to mark messages as read');
     return response.data.data;
   },
-  
+  deleteUser: async (userId: string) => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) throw new Error('No admin token found. Please log in.');
+    const response: any = await axios.delete(`${API_URL}/users/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to delete user');
+    return response.data.data;
+  },
   
 };
 

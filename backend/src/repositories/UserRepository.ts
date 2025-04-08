@@ -27,6 +27,10 @@ class UserRepository {
     user.set(updateData);
     return user.save();
   }
+  async deleteById(id: string): Promise<void> {
+    const result = await User.findByIdAndDelete(id);
+    if (!result) throw new Error('User not found');
+  }
 }
 
 export default new UserRepository();
