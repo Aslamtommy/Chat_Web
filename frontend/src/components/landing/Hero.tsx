@@ -3,10 +3,13 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import LoginModal from '../auth/LoginModal';
 import RegisterModal from '../auth/RegisterModal';
-
+import TermsModal from '../Modal/TermsModal';
+import ContactUsModal from '../Modal/ContacUsModal';
 const Hero = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
 
   const handleRegisterSuccess = () => {
     setIsRegisterModalOpen(false);
@@ -24,7 +27,7 @@ const Hero = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-stone-900/80 via-stone-900/70 to-stone-900/90" />
       </div>
 
-      <div className="relative z-10 min-h-screen">
+      <div className="relative z-10 min-h-screen flex flex-col justify-between">
         <div className="container mx-auto px-4 py-16 sm:py-20 lg:py-24">
           <div className="flex flex-col items-center justify-center">
             <motion.div
@@ -80,18 +83,46 @@ const Hero = () => {
           </div>
         </div>
 
-        
+        {/* Footer Links for Contact Us and Terms */}
+        <motion.div
+          className="container mx-auto px-4 py-4 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.8 }}
+        >
+          <div className="flex justify-center gap-6">
+            <button
+              onClick={() => setIsContactModalOpen(true)}
+              className="text-white/70 hover:text-amber-400 font-sans text-sm transition-colors duration-300"
+            >
+              Contact Us
+            </button>
+            <button
+              onClick={() => setIsTermsModalOpen(true)}
+              className="text-white/70 hover:text-amber-400 font-sans text-sm transition-colors duration-300"
+            >
+              Terms & Conditions
+            </button>
+          </div>
+        </motion.div>
       </div>
 
       <LoginModal 
         isOpen={isLoginModalOpen} 
         onClose={() => setIsLoginModalOpen(false)} 
       />
-
       <RegisterModal 
         isOpen={isRegisterModalOpen} 
         onClose={() => setIsRegisterModalOpen(false)}
         onRegisterSuccess={handleRegisterSuccess}
+      />
+      <ContactUsModal 
+        isOpen={isContactModalOpen} 
+        onClose={() => setIsContactModalOpen(false)} 
+      />
+      <TermsModal 
+        isOpen={isTermsModalOpen} 
+        onClose={() => setIsTermsModalOpen(false)} 
       />
     </div>
   );

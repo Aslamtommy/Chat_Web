@@ -1,10 +1,11 @@
+// ChatHeader.jsx
 import { useNavigate } from 'react-router-dom';
-import { LogOut, MessageSquareText, User, Bell, Mail, FileText } from 'lucide-react'; // Added Mail and FileText icons
+import { LogOut, MessageSquareText, User, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNotification } from '../../context/NotificationContext';
 
 interface ChatHeaderProps {
-  onProfileClick: () => void; // Prop to trigger profile modal
+  onProfileClick: () => void;
 }
 
 const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
@@ -16,7 +17,6 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
     navigate('/');
   };
 
-  // Animation variants for buttons
   const buttonVariants = {
     initial: { scale: 1, translateZ: 0, boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)' },
     hover: {
@@ -36,7 +36,6 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
   return (
     <header className="px-4 py-3 sm:px-6 sm:py-4 bg-black/20 backdrop-blur-sm border-b border-white/10">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Chat Title with Icon */}
         <div className="flex items-center gap-3 sm:gap-4">
           <div className="relative">
             <MessageSquareText className="w-6 h-6 sm:w-7 sm:h-7 text-amber-500" />
@@ -50,9 +49,7 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
           </h2>
         </div>
 
-        {/* Actions: Notification, Profile, Contact Us, Terms, Logout */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Notification Button */}
           <motion.button
             variants={buttonVariants}
             initial="initial"
@@ -71,7 +68,6 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             <span className="text-sm font-medium hidden sm:inline">Notifications</span>
           </motion.button>
 
-          {/* Profile Button */}
           <motion.button
             variants={buttonVariants}
             initial="initial"
@@ -85,35 +81,6 @@ const ChatHeader = ({ onProfileClick }: ChatHeaderProps) => {
             <span className="text-sm font-medium hidden sm:inline">Profile</span>
           </motion.button>
 
-          {/* Contact Us Button */}
-          <motion.button
-            variants={buttonVariants}
-            initial="initial"
-            whileHover="hover"
-            whileTap="tap"
-            onClick={() => navigate('/contact-us')}
-            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-2 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
-            style={{ transformStyle: 'preserve-3d' }}
-          >
-            <Mail className="w-5 h-5 group-hover:stroke-amber-500" /> {/* Added Mail icon */}
-            <span className="text-sm font-medium hidden sm:inline">Contact Us</span>
-          </motion.button>
-
-          {/* Terms & Conditions Button */}
-          <motion.button
-            variants={buttonVariants}
-            initial="initial"
-            whileHover="hover"
-            whileTap="tap"
-            onClick={() => navigate('/terms-and-conditions')}
-            className="flex items-center gap-2 text-white/70 hover:text-amber-500 font-sans px-2 py-2 sm:px-4 sm:py-2 rounded-xl border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 group"
-            style={{ transformStyle: 'preserve-3d' }}
-          >
-            <FileText className="w-5 h-5 group-hover:stroke-amber-500" /> {/* Added FileText icon */}
-            <span className="text-sm font-medium hidden sm:inline">Terms</span>
-          </motion.button>
-
-          {/* Logout Button */}
           <motion.button
             variants={buttonVariants}
             initial="initial"

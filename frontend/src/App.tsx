@@ -10,8 +10,7 @@ import FilesPage from './components/Pages/FilesPage';
 import { Toaster } from 'react-hot-toast';
 import { NotificationProvider } from './context/NotificationContext';
 import NotificationsPage from './components/Pages/NotificationsPage';
-import ContactUs from './components/Pages/ContactUs';
-import TermsAndConditions from './components/Pages/TermsAndConditions';
+ 
 import PaymentSuccess from './components/auth/PaymentSuccess';
 import Login from './components/auth/Login';
 
@@ -120,8 +119,7 @@ const AppContent = () => {
             </ProtectedRoute>
           }
         />
-        <Route path="/contact-us" element={<ContactUs />} />
-        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+     
       </Routes>
     </>
   );
