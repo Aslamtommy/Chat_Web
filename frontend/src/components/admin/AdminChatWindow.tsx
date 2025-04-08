@@ -427,61 +427,60 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         <>
           {/* Header */}
           <div className="sticky top-0 z-20 bg-gradient-to-r from-black/95 via-black/90 to-black/95 border-b border-amber-500/10 backdrop-blur-xl">
-            <div className="flex items-center justify-between px-3 py-2">
-              <div className="flex items-center space-x-2 min-w-0">
-                {isMobile && onBack && (
-                  <button
-                    onClick={onBack}
-                    className="md:hidden p-1.5 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30 flex-shrink-0"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
-                )}
-                <div className="relative group flex-shrink-0">
-                  <div className="w-8 h-8 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-lg flex items-center justify-center border border-amber-500/20 transition-all duration-300 group-hover:border-amber-500/30">
-                    <span className="text-sm font-medium text-amber-400 group-hover:text-amber-300">
-                      {username?.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="absolute -inset-0.5 bg-amber-500/10 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-medium text-amber-50/90 truncate">{username || 'User'}</h3>
-                  <p className="text-[10px] text-amber-400/60 truncate">Active Now</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-1 flex-shrink-0">
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => setShowUserDetails(true)}
-                  className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
-                  title="View User Details"
-                >
-                  <User className="w-3 h-3" />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => setShowPaymentRequests(true)}
-                  className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
-                  title="View Payment Requests"
-                >
-                  <Image className="w-3 h-3" />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => setShowRequestModal(true)}
-                  className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-300 px-3 py-1.5 rounded-lg hover:text-amber-200 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300"
-                  title="Request Payment Screenshot"
-                >
-                  <DollarSign className="w-3 h-3" />
-                </motion.button>
-              </div>
-            </div>
-          </div>
-
+  <div className="flex items-center justify-between px-4 py-4">
+    <div className="flex items-center space-x-3 min-w-0">
+      {isMobile && onBack && (
+        <button
+          onClick={onBack}
+          className="md:hidden p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30 flex-shrink-0"
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+      )}
+      <div className="relative group flex-shrink-0">
+        <div className="w-12 h-12 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-lg flex items-center justify-center border border-amber-500/20 transition-all duration-300 group-hover:border-amber-500/30">
+          <span className="text-lg font-medium text-amber-400 group-hover:text-amber-300">
+            {username?.charAt(0).toUpperCase()}
+          </span>
+        </div>
+        <div className="absolute -inset-0.5 bg-amber-500/10 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      </div>
+      <div className="min-w-0">
+        <h3 className="text-lg font-medium text-amber-50/90 truncate">{username || 'User'}</h3>
+        <p className="text-sm text-amber-400/60 truncate">Active Now</p>
+      </div>
+    </div>
+    <div className="flex items-center space-x-2 flex-shrink-0">
+      <motion.button
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => setShowUserDetails(true)}
+        className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
+        title="View User Details"
+      >
+        <User className="w-5 h-5" />
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => setShowPaymentRequests(true)}
+        className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
+        title="View Payment Requests"
+      >
+        <Image className="w-5 h-5" />
+      </motion.button>
+      <motion.button
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => setShowRequestModal(true)}
+        className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-300 px-4 py-2 rounded-lg hover:text-amber-200 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300"
+        title="Request Payment Screenshot"
+      >
+        <DollarSign className="w-5 h-5" />
+      </motion.button>
+    </div>
+  </div>
+</div>
           {/* Chat Container */}
           <div className="flex-1 flex flex-col min-h-0">
             {/* Messages */}
