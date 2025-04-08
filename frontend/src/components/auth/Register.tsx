@@ -36,7 +36,7 @@ const Register = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: 500,
+          amount: 499,
           currency: 'INR',
           customer_id: sanitizedCustomerId,
           customer_email: data.email,
