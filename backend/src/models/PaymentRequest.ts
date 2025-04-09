@@ -9,7 +9,7 @@ const paymentRequestSchema = new Schema<IPaymentRequest>({
     ifscCode: { type: String, required: true },
     amount: { type: String, required: true },
     name: { type: String, required: true },
-    upiId: { type: String, required: true },
+    upiId: { type: String },
   },
   status: { type: String, enum: ['pending', 'uploaded'], default: 'pending' },
   screenshotUrl: { type: String },

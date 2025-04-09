@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Loader2, MessageSquare, Clock,Trash2  } from 'lucide-react';
+import { Search, Loader2, MessageSquare, Clock, Trash2 } from 'lucide-react';
 import adminService from '../Services/adminService';
 import { openDB, DBSchema } from 'idb';
 
@@ -18,7 +18,6 @@ interface AdminSidebarProps {
   isMobile: boolean;
 }
 
-// IndexedDB Schema for Users
 interface UserDB extends DBSchema {
   users: {
     key: string;
@@ -27,7 +26,6 @@ interface UserDB extends DBSchema {
   };
 }
 
-// IndexedDB Helper Functions
 const getDB = async () => {
   return openDB<UserDB>('admin-users-db', 1, {
     upgrade(db) {
@@ -43,19 +41,25 @@ const saveUsersToDB = async (users: User[]) => {
   const store = tx.objectStore('users');
   await Promise.all(users.map((user) => store.put(user)));
   await tx.done;
+  console.log('[AdminSidebar] Saved users to IndexedDB:', users);
 };
 
 const getUsersFromDB = async (): Promise<User[]> => {
   const db = await getDB();
-  return db.getAll('users');
+  const users = await db.getAll('users');
+  console.log('[AdminSidebar] Fetched users from IndexedDB:', users);
+  return users;
 };
+
 const clearUsersFromDB = async (userId: string) => {
   const db = await getDB();
   const tx = db.transaction('users', 'readwrite');
   const store = tx.objectStore('users');
   await store.delete(userId);
   await tx.done;
+  console.log('[AdminSidebar] Cleared user from IndexedDB:', userId);
 };
+
 const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminSidebarProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,12 +69,14 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   const debounceTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const socketConnected = useRef(false);
   const hasFetchedInitialCounts = useRef(false);
+  const hasFetchedUsers = useRef(false); // Flag to prevent redundant fetches
 
   const debouncedSearch = useCallback((query: string) => {
     if (debounceTimeout.current) {
       clearTimeout(debounceTimeout.current);
     }
     debounceTimeout.current = setTimeout(() => {
+      console.log('[AdminSidebar] Debounced search query:', query.trim());
       setSearchQuery(query.trim());
     }, 300);
   }, []);
@@ -81,92 +87,106 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       if (!b.lastMessageTimestamp) return -1;
       return new Date(b.lastMessageTimestamp).getTime() - new Date(a.lastMessageTimestamp).getTime();
     });
-    console.log('Sorted users:', sorted.map((u) => ({ id: u._id, timestamp: u.lastMessageTimestamp })));
+    console.log('[AdminSidebar] Sorted users by timestamp:', sorted);
     return sorted;
   }, []);
 
   const fetchUserList = useCallback(async () => {
+    if (hasFetchedUsers.current) return; // Prevent redundant fetches
+    console.log('[AdminSidebar] Fetching user list, online:', navigator.onLine);
     try {
       setIsLoading(true);
       setError(null);
 
+      let initialUsers: User[] = [];
       if (!navigator.onLine) {
         const cachedUsers = await getUsersFromDB();
         if (cachedUsers.length > 0) {
-          setUsers(sortUsersByTimestamp(cachedUsers));
-          setIsLoading(false);
-          return;
+          console.log('[AdminSidebar] Using cached users:', cachedUsers);
+          initialUsers = cachedUsers;
         }
+      } else {
+        const userList = await adminService.getAllUsers();
+        console.log('[AdminSidebar] Received user list from API:', userList);
+        initialUsers = userList.map((user: any) => ({
+          _id: user._id,
+          username: user.username,
+          lastMessageTimestamp: user.lastMessageTimestamp || null,
+          unreadCount: 0, // Initial placeholder
+        }));
+        console.log('[AdminSidebar] Initial users with unreadCount 0:', initialUsers);
+        await saveUsersToDB(initialUsers);
       }
-
-      const userList = await adminService.getAllUsers();
-      const initialUsers = userList.map((user: any) => ({
-        _id: user._id,
-        username: user.username,
-        lastMessageTimestamp: user.lastMessageTimestamp || null,
-        unreadCount: 0,
-      }));
-      console.log('Fetched users:', initialUsers);
-      setUsers(sortUsersByTimestamp(initialUsers));
-      await saveUsersToDB(initialUsers);
+      setUsers((prevUsers) => {
+        const mergedUsers = [...prevUsers, ...initialUsers.filter((u) => !prevUsers.some((p) => p._id === u._id))];
+        console.log('[AdminSidebar] Merged users:', mergedUsers);
+        return sortUsersByTimestamp(mergedUsers);
+      });
+      hasFetchedUsers.current = true;
     } catch (err) {
+      console.error('[AdminSidebar] Error fetching users:', err);
       setError('Failed to load users');
-      console.error('Error fetching users:', err);
       const cachedUsers = await getUsersFromDB();
       if (cachedUsers.length > 0) {
-        setUsers(sortUsersByTimestamp(cachedUsers));
-        setError(null);
+        console.log('[AdminSidebar] Falling back to cached users:', cachedUsers);
+        setUsers((prevUsers) => sortUsersByTimestamp([...prevUsers, ...cachedUsers]));
       }
     } finally {
       setIsLoading(false);
+      console.log('[AdminSidebar] FetchUserList completed, users state:', users);
     }
   }, [sortUsersByTimestamp]);
 
- // Handle user deletion
- const handleDeleteUser = async (userId: string) => {
-  if (window.confirm('Are you sure you want to delete this user and their chat history?')) {
-    try {
-      await adminService.deleteUser(userId); // Delete user from server and clear IndexedDB messages
-      await clearUsersFromDB(userId); // Remove user from IndexedDB
-      setUsers((prev) => sortUsersByTimestamp(prev.filter((user) => user._id !== userId))); // Update local state
-      if (selectedUserId === userId) {
-        onSelectUser(null); // Deselect the user if they were selected
+  const handleDeleteUser = async (userId: string) => {
+    if (window.confirm('Are you sure you want to delete this user and their chat history?')) {
+      try {
+        console.log('[AdminSidebar] Deleting user:', userId);
+        await adminService.deleteUser(userId);
+        await clearUsersFromDB(userId);
+        setUsers((prev) => sortUsersByTimestamp(prev.filter((user) => user._id !== userId)));
+        if (selectedUserId === userId) {
+          onSelectUser(null);
+        }
+        if (socket) {
+          console.log('[AdminSidebar] Emitting userDeleted for:', userId);
+          socket.emit('userDeleted', { userId });
+        }
+      } catch (error) {
+        console.error('[AdminSidebar] Failed to delete user:', error);
+        alert('Failed to delete user. Please try again.');
       }
-      // Optionally emit a socket event if your backend supports it
-      if (socket) {
-        socket.emit('userDeleted', { userId });
-      }
-    } catch (error) {
-      console.error('Failed to delete user:', error);
-      alert('Failed to delete user. Please try again.');
     }
-  }
-};
+  };
 
   useEffect(() => {
+    console.log('[AdminSidebar] Mounting component');
     fetchUserList();
 
-    if (!socket) return; // Guard against null socket
+    if (!socket) {
+      console.log('[AdminSidebar] No socket provided');
+      return;
+    }
 
     const handleConnect = () => {
-      console.log('Socket connected');
+      console.log('[AdminSidebar] Socket connected');
       socketConnected.current = true;
       hasFetchedInitialCounts.current = false;
       socket.emit('syncUnreadCounts');
     };
 
     const handleDisconnect = () => {
-      console.log('Socket disconnected');
+      console.log('[AdminSidebar] Socket disconnected');
       socketConnected.current = false;
     };
 
     const handleInitialUnreadCounts = (unreadCounts: { [key: string]: number }) => {
-      console.log('Received initial unread counts:', unreadCounts);
+      console.log('[AdminSidebar] Received initial unread counts at:', new Date().toISOString(), 'data:', unreadCounts);
       setUsers((prevUsers) => {
         const updatedUsers = prevUsers.map((user) => ({
           ...user,
-          unreadCount: unreadCounts[user._id] || 0,
-        }));
+          unreadCount: unreadCounts[user._id] || user.unreadCount, // Merge with existing count
+        })).filter((user) => user._id in unreadCounts || user.unreadCount > 0); // Keep only relevant users
+        console.log('[AdminSidebar] Updated users with unread counts:', updatedUsers);
         hasFetchedInitialCounts.current = true;
         saveUsersToDB(updatedUsers);
         return sortUsersByTimestamp(updatedUsers);
@@ -174,32 +194,35 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     };
 
     const handleUpdateUnreadCount = ({ userId, unreadCount }: { userId: string; unreadCount: number }) => {
-      console.log('Updating unread count for', userId, 'to', unreadCount);
+      console.log('[AdminSidebar] Updating unread count for:', userId, 'to:', unreadCount);
       setUsers((prev) => {
         const updatedUsers = prev.map((user) =>
           user._id === userId && selectedUserId !== userId
             ? { ...user, unreadCount }
             : user
         );
+        console.log('[AdminSidebar] Updated users after unread count:', updatedUsers);
         saveUsersToDB(updatedUsers);
         return sortUsersByTimestamp(updatedUsers);
       });
     };
 
     const handleUpdateUserOrder = ({ userId, timestamp }: { userId: string; timestamp: string }) => {
-      console.log('Received updateUserOrder - userId:', userId, 'timestamp:', timestamp);
+      console.log('[AdminSidebar] Received updateUserOrder - userId:', userId, 'timestamp:', timestamp);
       setUsers((prev) => {
         const updatedUsers = prev.map((user) =>
           user._id === userId
             ? { ...user, lastMessageTimestamp: timestamp }
             : user
         );
+        console.log('[AdminSidebar] Updated users after order:', updatedUsers);
         saveUsersToDB(updatedUsers);
         return sortUsersByTimestamp(updatedUsers);
       });
     };
-    // Handle user deletion event from socket (if implemented on the backend)
+
     const handleUserDeleted = ({ userId }: { userId: string }) => {
+      console.log('[AdminSidebar] User deleted event received for:', userId);
       setUsers((prev) => sortUsersByTimestamp(prev.filter((user) => user._id !== userId)));
       if (selectedUserId === userId) {
         onSelectUser(null);
@@ -215,29 +238,34 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     socket.on('userDeleted', handleUserDeleted);
 
     if (socket.connected) {
+      console.log('[AdminSidebar] Socket already connected, emitting syncUnreadCounts');
       socket.emit('syncUnreadCounts');
     }
 
     return () => {
+      console.log('[AdminSidebar] Unmounting component');
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('initialUnreadCounts', handleInitialUnreadCounts);
       socket.off('updateUnreadCount', handleUpdateUnreadCount);
       socket.off('updateUserOrder', handleUpdateUserOrder);
+      socket.off('userDeleted', handleUserDeleted);
 
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current);
       }
     };
-  }, [socket, sortUsersByTimestamp, fetchUserList]);
+  }, [socket, sortUsersByTimestamp, fetchUserList, selectedUserId, onSelectUser]);
 
   useEffect(() => {
+    console.log('[AdminSidebar] Selected user changed, previous:', previousSelectedUserId.current, 'current:', selectedUserId);
     if (previousSelectedUserId.current && !selectedUserId) {
       // No action needed here; counts persist via socket
     }
     previousSelectedUserId.current = selectedUserId;
 
     if (selectedUserId) {
+      console.log('[AdminSidebar] Marking messages as read for:', selectedUserId);
       setUsers((prev) =>
         prev.map((user) =>
           user._id === selectedUserId ? { ...user, unreadCount: 0 } : user
@@ -247,20 +275,23 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
   }, [selectedUserId]);
 
   const handleUserClick = async (userId: string) => {
+    console.log('[AdminSidebar] User clicked:', userId);
     try {
       const user = users.find((u) => u._id === userId);
       if (user?.unreadCount && user.unreadCount > 0 && socket) {
+        console.log('[AdminSidebar] Marking messages as read for:', userId, 'count:', user.unreadCount);
         await adminService.markMessagesAsRead(userId);
         socket.emit('markMessagesAsRead', { chatId: userId });
         setUsers((prev) => {
           const updatedUsers = prev.map((u) => (u._id === userId ? { ...u, unreadCount: 0 } : u));
+          console.log('[AdminSidebar] Updated users after marking read:', updatedUsers);
           saveUsersToDB(updatedUsers);
           return updatedUsers;
         });
       }
       onSelectUser(userId);
     } catch (error) {
-      console.error('Error marking messages as read:', error);
+      console.error('[AdminSidebar] Error marking messages as read:', error);
     }
   };
 
@@ -283,7 +314,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
       </div>
 
       <div className="p-4 space-y-2">
-        {isLoading ? (
+        {isLoading || !hasFetchedInitialCounts.current ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
           </div>
@@ -347,7 +378,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
                   )}
                   <button
                     onClick={(e) => {
-                      e.stopPropagation(); // Prevent triggering user selection
+                      e.stopPropagation();
                       handleDeleteUser(user._id);
                     }}
                     className="text-red-500 hover:text-red-700 transition-colors p-1"
@@ -362,7 +393,7 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
         )}
       </div>
     </div>
-  )
+  );
 };
 
 export default AdminSidebar;

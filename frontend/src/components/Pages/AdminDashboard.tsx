@@ -13,10 +13,13 @@ const AdminDashboard = () => {
   const [isMobileView, setIsMobileView] = useState(false);
   const socketRef = useRef<any>(null);
   const navigate = useNavigate();
+  const syncTriggered = useRef(false); // Track if sync was triggered
+  const syncDebounce = useRef<NodeJS.Timeout | null>(null); // Debounce sync requests
 
   useEffect(() => {
     const checkMobileView = () => {
       const mobile = window.innerWidth < 768;
+      console.log('[AdminDashboard] Checking mobile view, width:', window.innerWidth, 'isMobile:', mobile);
       setIsMobileView(mobile);
     };
     
@@ -27,12 +30,15 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
+    console.log('[AdminDashboard] Checking token:', !!token);
     if (!token) {
+      console.log('[AdminDashboard] No token, navigating to login');
       navigate('/');
       return;
     }
 
     if (!socketRef.current) {
+      console.log('[AdminDashboard] Initializing socket with token:', token);
       socketRef.current = io(`${import.meta.env.VITE_API_URL}`, {
         auth: { token },
         reconnection: true,
@@ -41,39 +47,56 @@ const AdminDashboard = () => {
       });
 
       socketRef.current.on('connect', () => {
+        console.log('[AdminDashboard] Socket connected');
         setIsSocketConnected(true);
-        console.log('Admin socket connected');
-        socketRef.current.emit('syncUnreadCounts');
+        if (!syncTriggered.current) {
+          triggerSyncUnreadCounts();
+          syncTriggered.current = true;
+        }
       });
+
       socketRef.current.on('reconnect', () => {
-        console.log('Admin socket reconnected');
-        socketRef.current.emit('syncUnreadCounts');
+        console.log('[AdminDashboard] Socket reconnected');
+        setIsSocketConnected(true);
+        triggerSyncUnreadCounts();
       });
 
       socketRef.current.on('connect_error', (error: any) => {
-        console.error('Socket connection error:', error);
+        console.error('[AdminDashboard] Socket connection error:', error);
         setIsSocketConnected(false);
       });
 
       socketRef.current.on('disconnect', () => {
-        console.log('Admin socket disconnected');
+        console.log('[AdminDashboard] Socket disconnected');
         setIsSocketConnected(false);
       });
 
       socketRef.current.on('initialUnreadCounts', (unreadCounts: any) => {
-        console.log('Received initial unread counts in AdminDashboard:', unreadCounts);
+        console.log('[AdminDashboard] Received initial unread counts:', unreadCounts, 'at:', new Date().toISOString());
       });
     }
 
     return () => {
       if (socketRef.current) {
+        console.log('[AdminDashboard] Cleaning up socket');
         socketRef.current.disconnect();
         socketRef.current = null;
+        syncTriggered.current = false;
+        if (syncDebounce.current) clearTimeout(syncDebounce.current);
       }
     };
   }, [navigate]);
 
+  const triggerSyncUnreadCounts = () => {
+    if (syncDebounce.current) clearTimeout(syncDebounce.current);
+    syncDebounce.current = setTimeout(() => {
+      console.log('[AdminDashboard] Emitting syncUnreadCounts');
+      if (socketRef.current) socketRef.current.emit('syncUnreadCounts');
+    }, 500); // Debounce by 500ms
+  };
+
   const handleSelectUser = async (userId: string | null) => {
+    console.log('[AdminDashboard] Handling user selection, userId:', userId);
     if (userId === null) {
       setSelectedUserId(null);
       setSelectedUserName(null);
@@ -82,24 +105,31 @@ const AdminDashboard = () => {
     setSelectedUserId(userId);
     try {
       const user = await adminService.getUserById(userId);
+      console.log('[AdminDashboard] Fetched user details:', user);
       setSelectedUserName(user.username);
     } catch (error) {
-      console.error('Failed to fetch user details:', error);
+      console.error('[AdminDashboard] Failed to fetch user details:', error);
       setSelectedUserName(null);
     }
   };
 
   const handleBackToUsers = () => {
+    console.log('[AdminDashboard] Back to users, resetting selection');
     setSelectedUserId(null);
     setSelectedUserName(null);
     if (socketRef.current) {
-      socketRef.current.emit('syncUnreadCounts');
+      triggerSyncUnreadCounts(); // Use debounced sync
     }
   };
 
   const handleLogout = () => {
+    console.log('[AdminDashboard] Logging out');
     localStorage.removeItem('adminToken');
-    if (socketRef.current) socketRef.current.disconnect();
+    if (socketRef.current) {
+      console.log('[AdminDashboard] Disconnecting socket on logout');
+      socketRef.current.disconnect();
+    }
+    socketRef.current = null;
     navigate('/');
   };
 
@@ -112,7 +142,6 @@ const AdminDashboard = () => {
         hideOnMobile={isMobileView && selectedUserId !== null}
       />
       <div className="flex flex-1 overflow-hidden">
-        {/* Always render AdminSidebar, regardless of socket connection */}
         {(!isMobileView || selectedUserId === null) && (
           <AdminSidebar
             onSelectUser={handleSelectUser}
@@ -121,7 +150,6 @@ const AdminDashboard = () => {
             isMobile={isMobileView}
           />
         )}
-        {/* Render AdminChatWindow based on selection or desktop view */}
         {(!isMobileView || selectedUserId !== null) && (
           <div className="flex-1 flex flex-col">
             <AdminChatWindow

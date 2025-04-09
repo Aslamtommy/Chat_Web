@@ -1,15 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import adminService,{saveMessages,getMessagesFromDB} from '../Services/adminService';
+import adminService, { saveMessages, getMessagesFromDB } from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
- 
- 
 import { motion, AnimatePresence } from 'framer-motion';
 import { DollarSign, X, Check, User, ArrowLeft, Image } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 import chatService from '../Services/chatService';
 import axios from 'axios';
-
 
 interface Message {
   _id: string;
@@ -50,13 +47,6 @@ interface AdminChatWindowProps {
   onBack?: () => void;
 }
 
- 
-
- 
- 
-
- 
-
 const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [showToast, setShowToast] = useState(false);
@@ -75,60 +65,70 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   });
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const adminId = useRef<string | null>(null);
+  const isMounted = useRef(false);
 
   const scrollToBottom = useCallback(() => {
-    if (chatContainerRef.current) {
-      console.log('scrollToBottom called, scrollHeight:', chatContainerRef.current.scrollHeight);
+    if (chatContainerRef.current && isMounted.current) {
+      console.log('[AdminChatWindow] scrollToBottom called, scrollHeight:', chatContainerRef.current.scrollHeight);
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     } else {
-      console.warn('chatContainerRef.current is null');
+      console.warn('[AdminChatWindow] chatContainerRef.current is null or not mounted');
     }
   }, []);
 
   const markMessagesAsRead = useCallback(() => {
     if (userId && socket) {
+      console.log('[AdminChatWindow] Marking messages as read for:', userId);
       adminService
         .markMessagesAsRead(userId)
         .then(() => {
           socket.emit('markMessagesAsRead', { chatId: userId });
           socket.emit('syncUnreadCounts');
         })
-        .catch((error) => console.error('Failed to mark messages as read:', error));
+        .catch((error) => console.error('[AdminChatWindow] Failed to mark messages as read:', error));
     }
   }, [userId, socket]);
 
   const fetchPaymentRequests = useCallback(async () => {
     try {
       const token = localStorage.getItem('adminToken');
+      console.log('[AdminChatWindow] Fetching payment requests, token:', !!token);
       const response: any = await axios.get(`${import.meta.env.VITE_API_URL}/admin/payment-requests`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      console.log('[AdminChatWindow] Received payment requests:', response.data.data);
       setPaymentRequests(response.data.data);
     } catch (error) {
-      console.error('Failed to fetch payment requests:', error);
+      console.error('[AdminChatWindow] Failed to fetch payment requests:', error);
     }
   }, []);
 
   useEffect(() => {
+    console.log('[AdminChatWindow] Mounting component, userId:', userId);
+    isMounted.current = true;
     const token = localStorage.getItem('adminToken');
     if (!token || !userId) {
+      console.log('[AdminChatWindow] No token or userId, resetting messages');
       setMessages([]);
       return;
     }
 
     const decoded = JSON.parse(atob(token.split('.')[1]));
     adminId.current = decoded.id;
+    console.log('[AdminChatWindow] Decoded adminId:', adminId.current);
 
     const fetchChatHistory = async () => {
       try {
         if (!navigator.onLine) {
-          // Load from IndexedDB if offline
+          console.log('[AdminChatWindow] Offline, loading from IndexedDB for:', userId);
           const cachedMessages = await getMessagesFromDB(userId);
+          console.log('[AdminChatWindow] Cached messages:', cachedMessages);
           setMessages(cachedMessages);
           setTimeout(() => scrollToBottom(), 100);
           return;
         }
 
+        console.log('[AdminChatWindow] Fetching chat history for:', userId);
         const chat = await adminService.getUserChatHistory(userId);
         const formattedMessages: Message[] = chat.messages
           .map((msg: any) => {
@@ -148,15 +148,16 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             };
           })
           .filter((msg: any): msg is Message => msg !== null)
-          .filter((msg:any) => !msg.isDeleted) // Filter out deleted messages initially
+          .filter((msg: any) => !msg.isDeleted)
           .sort((a: any, b: any) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
+        console.log('[AdminChatWindow] Formatted messages:', formattedMessages);
         setMessages(formattedMessages);
-        saveMessages(userId, formattedMessages); // Save to IndexedDB
+        saveMessages(userId, formattedMessages);
         setTimeout(() => scrollToBottom(), 100);
         markMessagesAsRead();
       } catch (error) {
-        console.error('Failed to fetch chat history:', error);
+        console.error('[AdminChatWindow] Failed to fetch chat history:', error);
         setMessages([]);
       }
     };
@@ -165,11 +166,13 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     fetchPaymentRequests();
 
     const handleNewMessage = (message: Message) => {
+      console.log('[AdminChatWindow] Received new message:', message);
       if (message.chatId === userId || message.senderId === userId) {
         const isAdminMessage = message.senderId === adminId.current;
         setMessages((prev) => {
           const newMessages = [...prev, { ...message, status: 'delivered' as const, isSelf: isAdminMessage }];
-          saveMessages(userId, newMessages); // Update IndexedDB
+          console.log('[AdminChatWindow] Updated messages with new message:', newMessages);
+          saveMessages(userId, newMessages);
           return newMessages;
         });
         setTimeout(() => scrollToBottom(), 100);
@@ -178,6 +181,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
 
     const handleScreenshotUploaded = ({ paymentRequestId, userId: uploadedUserId, screenshotUrl }: { paymentRequestId: string; userId: string; screenshotUrl: string }) => {
+      console.log('[AdminChatWindow] Screenshot uploaded event:', { paymentRequestId, uploadedUserId, screenshotUrl });
       if (uploadedUserId === userId) {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
@@ -191,51 +195,64 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     };
 
     const handleMessageEdited = (updatedMessage: { _id: string; content: string; isEdited: boolean }) => {
+      console.log('[AdminChatWindow] Message edited event:', updatedMessage);
       setMessages((prev) => {
         const updatedMessages = prev.map((msg) =>
           msg._id === updatedMessage._id ? { ...msg, content: updatedMessage.content, isEdited: true } : msg
         );
-        saveMessages(userId, updatedMessages); // Update IndexedDB
+        console.log('[AdminChatWindow] Updated messages after edit:', updatedMessages);
+        saveMessages(userId, updatedMessages);
         return updatedMessages;
       });
     };
 
     const handleMessageDeleted = ({ messageId }: { messageId: string }) => {
-      console.log('Admin received messageDeleted for messageId:', messageId);
+      console.log('[AdminChatWindow] Message deleted event for:', messageId);
       setMessages((prev) => {
         const updatedMessages = prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg));
-        saveMessages(userId, updatedMessages); // Update IndexedDB
+        console.log('[AdminChatWindow] Updated messages after delete:', updatedMessages);
+        saveMessages(userId, updatedMessages);
         return updatedMessages;
       });
     };
+
     const handleUserDeleted = ({ userId: deletedUserId }: { userId: string }) => {
+      console.log('[AdminChatWindow] User deleted event for:', deletedUserId);
       if (userId === deletedUserId) {
         setMessages([]);
         setPaymentRequests([]);
-        if (onBack) onBack(); // Go back to user list on mobile
+        if (onBack) onBack();
       }
     };
-    socket.on('newMessage', handleNewMessage);
-    socket.on('screenshotUploaded', handleScreenshotUploaded);
-    socket.on('messageEdited', handleMessageEdited);
-    socket.on('messageDeleted', handleMessageDeleted);
-    socket?.on('userDeleted', handleUserDeleted); // Add this event listener
+
+    socket?.on('newMessage', handleNewMessage);
+    socket?.on('screenshotUploaded', handleScreenshotUploaded);
+    socket?.on('messageEdited', handleMessageEdited);
+    socket?.on('messageDeleted', handleMessageDeleted);
+    socket?.on('userDeleted', handleUserDeleted);
+
     return () => {
-      socket.off('newMessage', handleNewMessage);
-      socket.off('screenshotUploaded', handleScreenshotUploaded);
-      socket.off('messageEdited', handleMessageEdited);
-      socket.off('messageDeleted', handleMessageDeleted);
+      console.log('[AdminChatWindow] Unmounting component');
+      isMounted.current = false;
+      socket?.off('newMessage', handleNewMessage);
+      socket?.off('screenshotUploaded', handleScreenshotUploaded);
+      socket?.off('messageEdited', handleMessageEdited);
+      socket?.off('messageDeleted', handleMessageDeleted);
       socket?.off('userDeleted', handleUserDeleted);
     };
-  }, [userId, socket, markMessagesAsRead, fetchPaymentRequests]);
+  }, [userId, socket, markMessagesAsRead, fetchPaymentRequests, onBack]);
 
   useEffect(() => {
-    setTimeout(() => scrollToBottom(), 100);
+    console.log('[AdminChatWindow] Messages updated, triggering scroll:', messages.length);
+    if (isMounted.current) {
+      setTimeout(() => scrollToBottom(), 100);
+    }
   }, [messages, scrollToBottom]);
 
   const handleRequestScreenshot = async () => {
     if (!userId) return;
     try {
+      console.log('[AdminChatWindow] Requesting screenshot for:', userId, 'with details:', paymentDetails);
       const token = localStorage.getItem('adminToken');
       await axios.post(
         `${import.meta.env.VITE_API_URL}/admin/payment-request`,
@@ -257,7 +274,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       setPaymentDetails({ accountNumber: '', ifscCode: '', amount: '', name: '', upiId: '' });
       fetchPaymentRequests();
     } catch (error) {
-      console.error('Failed to request screenshot:', error);
+      console.error('[AdminChatWindow] Failed to request screenshot:', error);
     }
   };
 
@@ -278,9 +295,11 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         duration: messageType === 'voice' ? duration : undefined,
         timestamp: tempTimestamp,
       };
+      console.log('[AdminChatWindow] Sending temp message:', tempMessage);
       setMessages((prev) => {
         const newMessages = [...prev, tempMessage];
-        saveMessages(userId, newMessages); // Save to IndexedDB
+        console.log('[AdminChatWindow] Updated messages with temp:', newMessages);
+        saveMessages(userId, newMessages);
         return newMessages;
       });
       setTimeout(() => scrollToBottom(), 100);
@@ -300,15 +319,12 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           duration: messageType === 'voice' ? duration : undefined,
           tempId,
         };
-        console.log('Sending message via socket:', {
-          ...messageData,
-          content: messageType === 'text' ? messageContent : '[ArrayBuffer]',
-        });
+        console.log('[AdminChatWindow] Emitting sendMessage with:', messageData);
 
         socket.emit('sendMessage', messageData, (response: { status: string; message?: any }) => {
           if (response.status === 'success') {
             const savedMessage = response.message;
-            console.log('Message sent successfully:', savedMessage);
+            console.log('[AdminChatWindow] Message sent successfully:', savedMessage);
             setMessages((prev) => {
               const updatedMessages = prev.map((msg) =>
                 msg._id === tempId
@@ -321,7 +337,8 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                     }
                   : msg
               );
-              saveMessages(userId, updatedMessages); // Update IndexedDB
+              console.log('[AdminChatWindow] Updated messages after success:', updatedMessages);
+              saveMessages(userId, updatedMessages);
               return updatedMessages;
             });
             socket.emit('updateUserOrder', {
@@ -330,19 +347,21 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             });
             setTimeout(() => scrollToBottom(), 100);
           } else {
-            console.error('Failed to send message via socket:', response);
-            setMessages((prev:any) => {
-              const updatedMessages = prev.map((msg:any) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg));
-              saveMessages(userId, updatedMessages); // Update IndexedDB
+            console.error('[AdminChatWindow] Failed to send message via socket:', response);
+            setMessages((prev: any) => {
+              const updatedMessages = prev.map((msg: any) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg));
+              console.log('[AdminChatWindow] Updated messages after failure:', updatedMessages);
+              saveMessages(userId, updatedMessages);
               return updatedMessages;
             });
           }
         });
       } catch (error) {
-        console.error('Error sending message:', error);
-        setMessages((prev:any) => {
-          const updatedMessages = prev.map((msg:any) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg));
-          saveMessages(userId, updatedMessages); // Update IndexedDB
+        console.error('[AdminChatWindow] Error sending message:', error);
+        setMessages((prev: any) => {
+          const updatedMessages = prev.map((msg: any) => (msg._id === tempId ? { ...msg, status: 'failed' } : msg));
+          console.log('[AdminChatWindow] Updated messages after error:', updatedMessages);
+          saveMessages(userId, updatedMessages);
           return updatedMessages;
         });
       }
@@ -351,11 +370,13 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   );
 
   const handleEditStart = (messageId: string, content: string) => {
+    console.log('[AdminChatWindow] Starting edit for messageId:', messageId, 'content:', content);
     setEditingMessageId(messageId);
     setEditedContent(content);
   };
 
   const handleEditSave = (messageId: string) => {
+    console.log('[AdminChatWindow] Saving edit for messageId:', messageId, 'content:', editedContent);
     chatService
       .editMessageAdmin(messageId, editedContent)
       .then(() => {
@@ -364,103 +385,102 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
           const updatedMessages = prev.map((msg) =>
             msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
           );
-          if (userId) saveMessages(userId, updatedMessages); // Update IndexedDB
+          console.log('[AdminChatWindow] Updated messages after edit save:', updatedMessages);
+          if (userId) saveMessages(userId, updatedMessages);
           return updatedMessages;
         });
         setEditingMessageId(null);
         setEditedContent('');
       })
-      .catch((error) => console.error('Failed to edit message:', error));
+      .catch((error) => console.error('[AdminChatWindow] Failed to edit message:', error));
   };
 
   const handleDelete = (messageId: string) => {
-    console.log('handleDelete called in AdminChatWindow for messageId:', messageId);
+    console.log('[AdminChatWindow] Deleting message:', messageId);
     socket.emit('deleteMessage', { messageId }, (response: { status: string }) => {
       if (response.status === 'success') {
-        console.log('Message deleted successfully via socket, removing from state:', messageId);
+        console.log('[AdminChatWindow] Message deleted successfully, removing from state:', messageId);
         setMessages((prev) => {
-          const updatedMessages = prev.filter((msg) => msg._id !== messageId); // Remove the message entirely
+          const updatedMessages = prev.filter((msg) => msg._id !== messageId);
+          console.log('[AdminChatWindow] Updated messages after delete:', updatedMessages);
           if (userId) saveMessages(userId, updatedMessages);
           return updatedMessages;
         });
       } else {
-        console.error('Socket deletion failed:', response);
+        console.error('[AdminChatWindow] Socket deletion failed:', response);
       }
     });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    console.log('[AdminChatWindow] Payment input changed:', name, value);
     setPaymentDetails((prev) => ({ ...prev, [name]: value }));
   };
 
   const isPaymentDetailsValid = () => {
-    return  true
+    return true;
   };
 
   return (
     <div className="flex flex-col h-full bg-black/40 backdrop-blur-sm">
       {userId ? (
         <>
-          {/* Header */}
           <div className="sticky top-0 z-20 bg-gradient-to-r from-black/95 via-black/90 to-black/95 border-b border-amber-500/10 backdrop-blur-xl">
-  <div className="flex items-center justify-between px-4 py-4">
-    <div className="flex items-center space-x-3 min-w-0">
-      {isMobile && onBack && (
-        <button
-          onClick={onBack}
-          className="md:hidden p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30 flex-shrink-0"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-      )}
-      <div className="relative group flex-shrink-0">
-        <div className="w-12 h-12 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-lg flex items-center justify-center border border-amber-500/20 transition-all duration-300 group-hover:border-amber-500/30">
-          <span className="text-lg font-medium text-amber-400 group-hover:text-amber-300">
-            {username?.charAt(0).toUpperCase()}
-          </span>
-        </div>
-        <div className="absolute -inset-0.5 bg-amber-500/10 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-      </div>
-      <div className="min-w-0">
-        <h3 className="text-lg font-medium text-amber-50/90 truncate">{username || 'User'}</h3>
-      
-      </div>
-    </div>
-    <div className="flex items-center space-x-2 flex-shrink-0">
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={() => setShowUserDetails(true)}
-        className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
-        title="View User Details"
-      >
-        <User className="w-5 h-5" />
-      </motion.button>
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={() => setShowPaymentRequests(true)}
-        className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
-        title="View Payment Requests"
-      >
-        <Image className="w-5 h-5" />
-      </motion.button>
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={() => setShowRequestModal(true)}
-        className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-300 px-4 py-2 rounded-lg hover:text-amber-200 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300"
-        title="Request Payment Screenshot"
-      >
-        <DollarSign className="w-5 h-5" />
-      </motion.button>
-    </div>
-  </div>
-</div>
-          {/* Chat Container */}
+            <div className="flex items-center justify-between px-4 py-4">
+              <div className="flex items-center space-x-3 min-w-0">
+                {isMobile && onBack && (
+                  <button
+                    onClick={onBack}
+                    className="md:hidden p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30 flex-shrink-0"
+                  >
+                    <ArrowLeft className="w-6 h-6" />
+                  </button>
+                )}
+                <div className="relative group flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-lg flex items-center justify-center border border-amber-500/20 transition-all duration-300 group-hover:border-amber-500/30">
+                    <span className="text-lg font-medium text-amber-400 group-hover:text-amber-300">
+                      {username?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="absolute -inset-0.5 bg-amber-500/10 rounded-lg blur opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-medium text-amber-50/90 truncate">{username || 'User'}</h3>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 flex-shrink-0">
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowUserDetails(true)}
+                  className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
+                  title="View User Details"
+                >
+                  <User className="w-5 h-5" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowPaymentRequests(true)}
+                  className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
+                  title="View Payment Requests"
+                >
+                  <Image className="w-5 h-5" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowRequestModal(true)}
+                  className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-300 px-4 py-2 rounded-lg hover:text-amber-200 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300"
+                  title="Request Payment Screenshot"
+                >
+                  <DollarSign className="w-5 h-5" />
+                </motion.button>
+              </div>
+            </div>
+          </div>
           <div className="flex-1 flex flex-col min-h-0">
-            {/* Messages */}
             <div
               ref={chatContainerRef}
               className="flex-1 overflow-y-auto px-3 sm:px-4 pb-2 scrollbar-thin scrollbar-thumb-amber-500/20 scrollbar-track-transparent"
@@ -476,18 +496,13 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                 onDelete={handleDelete}
               />
             </div>
-
-            {/* Input */}
             <div className="sticky bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/90 to-black/85 backdrop-blur-xl border-t border-amber-500/10">
               <div className="px-2 py-1 sm:px-3 sm:py-1">
                 <ChatInput onSend={handleSend} />
               </div>
             </div>
           </div>
-
-          {/* Modals */}
           <div className="z-30">
-            {/* Payment Request Modal */}
             <AnimatePresence>
               {showRequestModal && (
                 <motion.div
@@ -576,7 +591,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               )}
             </AnimatePresence>
 
-            {/* Payment Requests View Modal */}
             <AnimatePresence>
               {showPaymentRequests && (
                 <motion.div
@@ -602,7 +616,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                     </div>
                     <div className="space-y-3">
                       {paymentRequests
-                        .filter((pr) => pr.userId?._id === userId) // Safe filtering with optional chaining
+                        .filter((pr) => pr.userId?._id === userId)
                         .map((pr) => (
                           <motion.div
                             key={pr._id}
@@ -662,7 +676,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               )}
             </AnimatePresence>
 
-            {/* User Details Modal */}
             {showUserDetails && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -691,7 +704,6 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             )}
           </div>
 
-          {/* Toast */}
           <AnimatePresence>
             {showToast && (
               <motion.div
