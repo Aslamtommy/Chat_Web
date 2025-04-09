@@ -447,7 +447,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
       </div>
       <div className="min-w-0">
         <h3 className="text-lg font-medium text-amber-50/90 truncate">{username || 'User'}</h3>
-        <p className="text-sm text-amber-400/60 truncate">Active Now</p>
+      
       </div>
     </div>
     <div className="flex items-center space-x-2 flex-shrink-0">
@@ -625,7 +625,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                     </div>
                     <div className="space-y-3">
                       {paymentRequests
-                        .filter((pr) => pr.userId._id === userId)
+                        .filter((pr) => pr.userId?._id === userId) // Safe filtering with optional chaining
                         .map((pr) => (
                           <motion.div
                             key={pr._id}
@@ -676,7 +676,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                             </div>
                           </motion.div>
                         ))}
-                      {paymentRequests.filter((pr) => pr.userId._id === userId).length === 0 && (
+                      {paymentRequests.filter((pr) => pr.userId?._id === userId).length === 0 && (
                         <p className="text-white/70 text-center text-sm">No payment requests found.</p>
                       )}
                     </div>
