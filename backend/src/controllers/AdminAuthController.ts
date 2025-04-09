@@ -5,7 +5,7 @@ import UserRepository from '../repositories/UserRepository';
 import ChatRepository from '../repositories/ChatRepository';
 import { IUser } from '../types';
 import mongoose from 'mongoose';
-
+import { io } from '../server';
 interface UserWithId extends IUser {
   _id: mongoose.Types.ObjectId;
 }
@@ -92,7 +92,8 @@ class AdminAuthController {
 
       // Delete the user's chat thread
       await ChatRepository.deleteByUserId(userId);
-
+// Emit userDeleted event to all admins
+io.to('admin-room').emit('userDeleted', { userId });
       res.json({ success: true, message: 'User and their chat history deleted successfully' });
     } catch (error) {
       console.error('Error deleting user:', error);

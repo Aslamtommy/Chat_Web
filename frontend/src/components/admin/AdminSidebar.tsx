@@ -49,7 +49,13 @@ const getUsersFromDB = async (): Promise<User[]> => {
   const db = await getDB();
   return db.getAll('users');
 };
-
+const clearUsersFromDB = async (userId: string) => {
+  const db = await getDB();
+  const tx = db.transaction('users', 'readwrite');
+  const store = tx.objectStore('users');
+  await store.delete(userId);
+  await tx.done;
+};
 const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminSidebarProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,21 +122,26 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
     }
   }, [sortUsersByTimestamp]);
 
-  // Handle user deletion
-  const handleDeleteUser = async (userId: string) => {
-    if (window.confirm('Are you sure you want to delete this user and their chat history?')) {
-      try {
-        await adminService.deleteUser(userId); // Call the new deleteUser service
-        await fetchUserList(); // Refresh the user list
-        if (selectedUserId === userId) {
-          onSelectUser(null); // Deselect the user if they were selected
-        }
-      } catch (error) {
-        console.error('Failed to delete user:', error);
-        alert('Failed to delete user. Please try again.');
+ // Handle user deletion
+ const handleDeleteUser = async (userId: string) => {
+  if (window.confirm('Are you sure you want to delete this user and their chat history?')) {
+    try {
+      await adminService.deleteUser(userId); // Delete user from server and clear IndexedDB messages
+      await clearUsersFromDB(userId); // Remove user from IndexedDB
+      setUsers((prev) => sortUsersByTimestamp(prev.filter((user) => user._id !== userId))); // Update local state
+      if (selectedUserId === userId) {
+        onSelectUser(null); // Deselect the user if they were selected
       }
+      // Optionally emit a socket event if your backend supports it
+      if (socket) {
+        socket.emit('userDeleted', { userId });
+      }
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      alert('Failed to delete user. Please try again.');
     }
-  };
+  }
+};
 
   useEffect(() => {
     fetchUserList();
@@ -187,12 +198,21 @@ const AdminSidebar = ({ onSelectUser, selectedUserId, socket, isMobile }: AdminS
         return sortUsersByTimestamp(updatedUsers);
       });
     };
+    // Handle user deletion event from socket (if implemented on the backend)
+    const handleUserDeleted = ({ userId }: { userId: string }) => {
+      setUsers((prev) => sortUsersByTimestamp(prev.filter((user) => user._id !== userId)));
+      if (selectedUserId === userId) {
+        onSelectUser(null);
+      }
+      clearUsersFromDB(userId);
+    };
 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('initialUnreadCounts', handleInitialUnreadCounts);
     socket.on('updateUnreadCount', handleUpdateUnreadCount);
     socket.on('updateUserOrder', handleUpdateUserOrder);
+    socket.on('userDeleted', handleUserDeleted);
 
     if (socket.connected) {
       socket.emit('syncUnreadCounts');

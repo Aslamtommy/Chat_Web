@@ -100,7 +100,7 @@ const AdminDashboard = () => {
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
     if (socketRef.current) socketRef.current.disconnect();
-    navigate('/admin/login');
+    navigate('/');
   };
 
   return (

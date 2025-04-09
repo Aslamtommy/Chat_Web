@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import adminService from '../Services/adminService';
+import adminService,{saveMessages,getMessagesFromDB} from '../Services/adminService';
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
+ 
+ 
 import { motion, AnimatePresence } from 'framer-motion';
 import { DollarSign, X, Check, User, ArrowLeft, Image } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 import chatService from '../Services/chatService';
 import axios from 'axios';
-import { openDB, DBSchema,   } from 'idb';
+
 
 interface Message {
   _id: string;
@@ -48,44 +50,12 @@ interface AdminChatWindowProps {
   onBack?: () => void;
 }
 
-// IndexedDB Schema
-interface ChatDB extends DBSchema {
-  messages: {
-    key: string;
-    value: Message & { userId: string }; // Add userId to differentiate chats
-    indexes: { 'timestamp-userId': [string, string] };
-  };
-}
+ 
 
-// IndexedDB Helper Functions
-const getDB = async () => {
-  return openDB<ChatDB>('admin-chat-db', 1, {
-    upgrade(db) {
-      const store = db.createObjectStore('messages', { keyPath: '_id' });
-      store.createIndex('timestamp-userId', ['timestamp', 'userId']);
-    },
-  });
-};
+ 
+ 
 
-const saveMessages = async (userId: string, messages: Message[]) => {
-  const db = await getDB();
-  const tx = db.transaction('messages', 'readwrite');
-  const store = tx.objectStore('messages');
-  await Promise.all(messages.map((message) => store.put({ ...message, userId })));
-  await tx.done;
-};
-
-const getMessagesFromDB = async (userId: string): Promise<Message[]> => {
-  const db = await getDB();
-  const tx = db.transaction('messages', 'readonly');
-  const store = tx.objectStore('messages');
-  const index = store.index('timestamp-userId');
-  const messages = await index.getAll(IDBKeyRange.bound(['', userId], ['￿', userId]));
-  return messages.map((msg) => ({
-    ...msg,
-    userId: undefined, // Remove userId from the returned message
-  }));
-};
+ 
 
 const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -238,17 +208,24 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
         return updatedMessages;
       });
     };
-
+    const handleUserDeleted = ({ userId: deletedUserId }: { userId: string }) => {
+      if (userId === deletedUserId) {
+        setMessages([]);
+        setPaymentRequests([]);
+        if (onBack) onBack(); // Go back to user list on mobile
+      }
+    };
     socket.on('newMessage', handleNewMessage);
     socket.on('screenshotUploaded', handleScreenshotUploaded);
     socket.on('messageEdited', handleMessageEdited);
     socket.on('messageDeleted', handleMessageDeleted);
-
+    socket?.on('userDeleted', handleUserDeleted); // Add this event listener
     return () => {
       socket.off('newMessage', handleNewMessage);
       socket.off('screenshotUploaded', handleScreenshotUploaded);
       socket.off('messageEdited', handleMessageEdited);
       socket.off('messageDeleted', handleMessageDeleted);
+      socket?.off('userDeleted', handleUserDeleted);
     };
   }, [userId, socket, markMessagesAsRead, fetchPaymentRequests]);
 

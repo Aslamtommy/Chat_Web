@@ -1,6 +1,7 @@
 import axios from 'axios';
-
-const API_URL = `${import.meta.env.VITE_API_URL}/admin` 
+import { clearMessagesForUser, saveMessages, getMessagesFromDB } from  '../../utils/indexedDB';
+ 
+const API_URL = `${import.meta.env.VITE_API_URL}/admin`;
 
 const adminService = {
   adminLogin: async (data: { email: string; password: string }) => {
@@ -12,12 +13,12 @@ const adminService = {
   getAllUsers: async () => {
     const token = localStorage.getItem('adminToken');
     if (!token) throw new Error('No admin token found. Please log in.');
-    
+
     // Get users with their last message in a single API call
     const response: any = await axios.get(`${API_URL}/users/with-last-message`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    
+
     if (!response.data.success) throw new Error(response.data.error || 'Failed to fetch users');
     return response.data.data;
   },
@@ -84,17 +85,21 @@ const adminService = {
     if (!response.data.success) throw new Error(response.data.error || 'Failed to mark messages as read');
     return response.data.data;
   },
+
   deleteUser: async (userId: string) => {
     const token = localStorage.getItem('adminToken');
     if (!token) throw new Error('No admin token found. Please log in.');
     const response: any = await axios.delete(`${API_URL}/users/${userId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (response.data.success) {
+      // Cleanup IndexedDB after successful deletion
+      await clearMessagesForUser(userId);
+    }
     if (!response.data.success) throw new Error(response.data.error || 'Failed to delete user');
     return response.data.data;
   },
-  
 };
 
-
 export default adminService;
+export { saveMessages, getMessagesFromDB, clearMessagesForUser }; // Export for use in other files
