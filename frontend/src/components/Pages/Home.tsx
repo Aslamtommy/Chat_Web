@@ -8,7 +8,7 @@ import ProfileModal from '../Modal/ProfileModal';
 import { useNotification } from '../../context/NotificationContext';
 import { openDB, DBSchema } from 'idb';
 import toast from 'react-hot-toast';
-
+import { motion } from 'framer-motion'; // For animations
 interface Message {
   _id: string;
   content: string;
@@ -71,6 +71,7 @@ const Home = () => {
   const pendingMessages = useRef<Set<string>>(new Set());
   const userId = useRef<string>('');
   const { setUnreadCount }: any = useNotification();
+  const [showCreditsPopup, setShowCreditsPopup] = useState(false); // New state for popup
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
@@ -101,6 +102,7 @@ const Home = () => {
   }, []);
 
   const handleBuyMoreMessages = () => {
+    setShowCreditsPopup(false); // Close popup when navigating
     navigate('/payment');
   };
 
@@ -162,7 +164,12 @@ const Home = () => {
     socketRef.current.on('newMessage', handleNewMessage);
     socketRef.current.on('messageDelivered', handleMessageDelivered);
 
-    socketRef.current.on('creditsUpdated', (data: { message_credits: number }) => {
+socketRef.current.on('creditsUpdated', (data: { message_credits: number }) => {
+      setMessageCredits(data.message_credits);
+      if (data.message_credits <= 0 && !showCreditsPopup) {
+        setShowCreditsPopup(true); // Show popup when credits hit 0
+      }
+    });socketRef.current.on('creditsUpdated', (data: { message_credits: number }) => {
       setMessageCredits(data.message_credits);
       console.log('Credits updated:', data.message_credits);
     });
@@ -208,11 +215,7 @@ const Home = () => {
       if (!socketRef.current || !userId.current) return;
 
       if (messageCredits <= 0) {
-        toast.error('You have no message credits left. Please buy more to continue chatting.', {
-          duration: 4000,
-          position: 'top-center',
-          style: { background: '#333', color: '#fff' },
-        });
+        setShowCreditsPopup(true); // Show popup instead of toast
         return;
       }
 
@@ -373,10 +376,44 @@ const Home = () => {
           </>
         )}
       </div>
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-      />
+      <ProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
+
+      {/* Credits Over Popup */}
+      {showCreditsPopup && (
+        <motion.div
+          className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="bg-gradient-to-br from-gray-900 to-black p-6 rounded-xl shadow-2xl border border-amber-500/20 max-w-md w-full mx-4"
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <h2 className="text-2xl font-bold text-white mb-2">Whoops! Credits Exhausted</h2>
+            <p className="text-white/80 mb-4">
+              Looks like you've run out of message credits. Top up now to keep the conversation flowing!
+            </p>
+            <div className="flex justify-between items-center">
+              <span className="text-amber-400 font-semibold">20 Credits for ₹100</span>
+              <button
+                onClick={handleBuyMoreMessages}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2 rounded-full font-medium transition-all duration-300 shadow-lg shadow-amber-500/20"
+              >
+                Buy Now
+              </button>
+            </div>
+            <button
+              onClick={() => setShowCreditsPopup(false)}
+              className="mt-4 text-white/60 hover:text-white text-sm underline"
+            >
+              Maybe Later
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };
