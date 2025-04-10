@@ -19,5 +19,6 @@ router.post('/finalize-registration', AuthController.finalizeRegistration);
 router.post('/create-order', PaymentController.createOrder);
 router.get('/payment-requests', authMiddleware as RequestHandler, PaymentController.getUserPaymentRequests);
 router.post('/payment-request/:id/upload', authMiddleware as RequestHandler, upload.single('file'), PaymentController.uploadScreenshot);
-
+router.post('/buy-credits', authMiddleware as RequestHandler, PaymentController.buyCredits);
+router.post('/finalize-credits', PaymentController.finalizeCredits);
 export default router;

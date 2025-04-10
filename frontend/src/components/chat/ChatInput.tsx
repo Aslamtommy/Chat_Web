@@ -7,9 +7,10 @@ interface ChatInputProps {
     content: string | File,
     duration?: number
   ) => void;
+  isDisabled: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled }) => {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -19,13 +20,13 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const startRecording = async () => {
+    if (isDisabled) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-      startTimeRef.current = Date.now(); // Set start time for duration calculation
-      console.log('Start time set to:', startTimeRef.current);
+      startTimeRef.current = Date.now();
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -49,7 +50,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
         clearInterval(timerRef.current);
       }
 
-      // No need for updateDuration timer since we're not displaying the count
       console.log('Recording started');
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -71,13 +71,14 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
+    if (message.trim() && !isDisabled) {
       onSend('text', message);
       setMessage('');
     }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isDisabled) return;
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
       onSend('image', file);
@@ -88,11 +89,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
   };
 
   const openFilePicker = () => {
-    fileInputRef.current?.click();
+    if (!isDisabled) fileInputRef.current?.click();
   };
 
   useEffect(() => {
-    console.log('ChatInput rendered, isRecording:', isRecording);
+    console.log('ChatInput rendered, isRecording:', isRecording, 'isDisabled:', isDisabled);
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -103,12 +104,12 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
         mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [isRecording]);
+  }, [isRecording, isDisabled]);
 
   return (
     <div className="p-4 bg-black/20 backdrop-blur-sm border-t border-white/10">
       <form onSubmit={handleSubmit} className="flex items-center gap-3">
-        {!isRecording && (
+        {!isRecording && !isDisabled && (
           <>
             <Paperclip
               onClick={openFilePicker}
@@ -142,14 +143,17 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type a message"
-              className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-amber-500/50 text-white placeholder-white/40 text-sm focus:outline-none transition-colors"
+              placeholder={isDisabled ? "No credits left. Buy more to chat." : "Type a message"}
+              className={`w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-amber-500/50 text-white placeholder-white/40 text-sm focus:outline-none transition-colors ${
+                isDisabled ? 'cursor-not-allowed opacity-50' : ''
+              }`}
+              disabled={isDisabled}
             />
           )}
         </div>
 
         <div className="flex items-center">
-          {isRecording ? null : message.trim() ? (
+          {isRecording ? null : message.trim() && !isDisabled ? (
             <button
               type="submit"
               className="bg-amber-500 hover:bg-amber-600 text-white p-2 rounded-full transition-colors"
@@ -160,7 +164,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend }) => {
             <button
               type="button"
               onClick={startRecording}
-              className="p-2 rounded-full transition-colors bg-transparent"
+              className={`p-2 rounded-full transition-colors bg-transparent ${
+                isDisabled ? 'cursor-not-allowed opacity-50' : ''
+              }`}
+              disabled={isDisabled}
             >
               <Mic className="w-5 h-5 text-amber-500" />
             </button>

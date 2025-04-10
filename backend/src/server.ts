@@ -14,7 +14,7 @@ import dotenv from 'dotenv';
 import ChatRepository from './repositories/ChatRepository';
 import ChatThread from './models/ChatThread';
 import { IChatThread, IMessage } from './types';
-
+import UserRepository from './repositories/UserRepository';
 declare module 'express' {
   export interface Request {
     user?: { id: string; role: string };
@@ -109,7 +109,13 @@ io.on('connection', (socket: Socket) => {
     socket.join('admin-room');
     syncUnreadCounts(socket);
   }
-
+// Sync credits on connection
+UserRepository.findById(userId).then(user => {
+  if (user) {
+    socket.emit('creditsUpdated', { message_credits: user.message_credits });
+    console.log('[Server] Sent credits to user:', userId, 'credits:', user.message_credits);
+  }
+});
   socket.on('getChatHistory', async () => {
     try {
       console.log('[Server] getChatHistory requested by:', userId);
@@ -144,6 +150,7 @@ io.on('connection', (socket: Socket) => {
         finalContent = await StorageService.uploadFileFromSocket(content, messageType === 'image' ? 'image' : 'audio');
       }
 
+      // Save the message (credit deduction happens in ChatService.saveMessage for non-admins)
       const updatedChat = await ChatService.saveMessage(chatThreadId, senderId, messageType, finalContent, duration);
       const newMessage = updatedChat.messages[updatedChat.messages.length - 1];
 
@@ -159,6 +166,15 @@ io.on('connection', (socket: Socket) => {
         isAdmin,
         read: newMessage.read_by_admin,
       };
+
+      // Emit updated credits for non-admin users after successful message save
+      if (!isAdmin) {
+        const user = await UserRepository.findById(senderId);
+        if (user) {
+          socket.emit('creditsUpdated', { message_credits: user.message_credits });
+          console.log('[Server] Emitted creditsUpdated for user:', senderId, 'credits:', user.message_credits);
+        }
+      }
 
       if (isAdmin) {
         console.log('[Server] Emitting newMessage to user:', targetUserId);

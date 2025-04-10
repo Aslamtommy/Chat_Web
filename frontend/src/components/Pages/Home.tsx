@@ -7,6 +7,7 @@ import ChatInput from '../chat/ChatInput';
 import ProfileModal from '../Modal/ProfileModal';
 import { useNotification } from '../../context/NotificationContext';
 import { openDB, DBSchema } from 'idb';
+import toast from 'react-hot-toast';
 
 interface Message {
   _id: string;
@@ -63,8 +64,9 @@ const Home = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editedContent, setEditedContent] = useState<string>('');
+  const [messageCredits, setMessageCredits] = useState<number>(0); // Initial value will be set by socket
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<SocketIOClient.Socket | null>(null);
+  const socketRef = useRef<any>(null);
   const navigate = useNavigate();
   const pendingMessages = useRef<Set<string>>(new Set());
   const userId = useRef<string>('');
@@ -80,7 +82,7 @@ const Home = () => {
     setMessages((prev) => {
       if (prev.some((m) => m._id === message._id)) return prev;
       const newMessages = [...prev, { ...message, isSelf: message.senderId === userId.current }];
-      saveMessages(newMessages); // Save to IndexedDB
+      saveMessages(newMessages);
       return newMessages;
     });
     scrollToBottom();
@@ -93,10 +95,14 @@ const Home = () => {
           ? { ...message, status: 'delivered', isSelf: message.senderId === userId.current }
           : msg
       );
-      saveMessages(updatedMessages); // Update IndexedDB
+      saveMessages(updatedMessages);
       return updatedMessages;
     });
   }, []);
+
+  const handleBuyMoreMessages = () => {
+    navigate('/payment');
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -105,14 +111,15 @@ const Home = () => {
       return;
     }
 
-    // Check if offline and load cached chat history from IndexedDB
     if (!navigator.onLine) {
-      getMessagesFromDB().then((cachedMessages) => {
-        setMessages(cachedMessages);
-        setTimeout(scrollToBottom, 0);
-      }).catch((error) => {
-        console.error('Error loading messages from IndexedDB:', error);
-      });
+      getMessagesFromDB()
+        .then((cachedMessages) => {
+          setMessages(cachedMessages);
+          setTimeout(scrollToBottom, 0);
+        })
+        .catch((error) => {
+          console.error('Error loading messages from IndexedDB:', error);
+        });
       return;
     }
 
@@ -128,6 +135,7 @@ const Home = () => {
       userId.current = decoded.id;
       console.log('Socket connected, userId:', userId.current);
       socketRef.current?.emit('getChatHistory');
+      // Credits are synced by the server via 'creditsUpdated' event
     });
 
     socketRef.current.on('chatHistory', (chat: { messages: any[] }) => {
@@ -147,12 +155,17 @@ const Home = () => {
         .sort((a, b) => new Date(a.timestamp || '').getTime() - new Date(b.timestamp || '').getTime());
 
       setMessages(formattedMessages);
-      saveMessages(formattedMessages); // Save to IndexedDB
+      saveMessages(formattedMessages);
       setTimeout(scrollToBottom, 0);
     });
 
     socketRef.current.on('newMessage', handleNewMessage);
     socketRef.current.on('messageDelivered', handleMessageDelivered);
+
+    socketRef.current.on('creditsUpdated', (data: { message_credits: number }) => {
+      setMessageCredits(data.message_credits);
+      console.log('Credits updated:', data.message_credits);
+    });
 
     socketRef.current.on('paymentRequest', () => {
       console.log('Received paymentRequest');
@@ -164,7 +177,7 @@ const Home = () => {
         const updatedMessages = prev.map((msg) =>
           msg._id === updatedMessage._id ? { ...msg, content: updatedMessage.content, isEdited: true } : msg
         );
-        saveMessages(updatedMessages); // Update IndexedDB
+        saveMessages(updatedMessages);
         return updatedMessages;
       });
     });
@@ -172,7 +185,7 @@ const Home = () => {
     socketRef.current.on('messageDeleted', ({ messageId }: { messageId: string }) => {
       setMessages((prev) => {
         const updatedMessages = prev.map((msg) => (msg._id === messageId ? { ...msg, isDeleted: true } : msg));
-        saveMessages(updatedMessages); // Update IndexedDB
+        saveMessages(updatedMessages);
         return updatedMessages;
       });
     });
@@ -194,6 +207,15 @@ const Home = () => {
     async (messageType: 'text' | 'image' | 'voice', content: string | File, duration?: number) => {
       if (!socketRef.current || !userId.current) return;
 
+      if (messageCredits <= 0) {
+        toast.error('You have no message credits left. Please buy more to continue chatting.', {
+          duration: 4000,
+          position: 'top-center',
+          style: { background: '#333', color: '#fff' },
+        });
+        return;
+      }
+
       const tempId = Date.now().toString();
       const tempTimestamp = new Date().toISOString();
       const tempMessage: Message = {
@@ -210,7 +232,7 @@ const Home = () => {
       pendingMessages.current.add(tempId);
       setMessages((prev) => {
         const newMessages = [...prev, tempMessage];
-        saveMessages(newMessages); // Save to IndexedDB
+        saveMessages(newMessages);
         return newMessages;
       });
       scrollToBottom();
@@ -220,7 +242,7 @@ const Home = () => {
           const updatedMessages = prev.map((msg: any) =>
             msg._id === tempId ? { ...msg, status: 'failed' } : msg
           );
-          saveMessages(updatedMessages); // Update IndexedDB
+          saveMessages(updatedMessages);
           return updatedMessages;
         });
         pendingMessages.current.delete(tempId);
@@ -247,7 +269,7 @@ const Home = () => {
               const updatedMessages = prev.map((msg: any) =>
                 msg._id === tempId ? { ...ack.message, isSelf: true, status: 'delivered' } : msg
               );
-              saveMessages(updatedMessages); // Update IndexedDB
+              saveMessages(updatedMessages);
               return updatedMessages;
             });
             pendingMessages.current.delete(tempId);
@@ -257,15 +279,23 @@ const Home = () => {
               const updatedMessages = prev.map((msg: any) =>
                 msg._id === tempId ? { ...msg, status: 'failed' } : msg
               );
-              saveMessages(updatedMessages); // Update IndexedDB
+              saveMessages(updatedMessages);
               return updatedMessages;
             });
             pendingMessages.current.delete(tempId);
+            if (ack.error === 'Insufficient message credits') {
+              setMessageCredits(0);
+              toast.error('You have no message credits left. Please buy more to continue chatting.', {
+                duration: 4000,
+                position: 'top-center',
+                style: { background: '#333', color: '#fff' },
+              });
+            }
           }
         }
       );
     },
-    [scrollToBottom]
+    [scrollToBottom, messageCredits]
   );
 
   const handleEditStart = (messageId: string, content: string) => {
@@ -275,12 +305,11 @@ const Home = () => {
 
   const handleEditSave = (messageId: string) => {
     if (!navigator.onLine) {
-      // Offline: Update locally only
       setMessages((prev) => {
         const updatedMessages = prev.map((msg) =>
           msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
         );
-        saveMessages(updatedMessages); // Update IndexedDB
+        saveMessages(updatedMessages);
         return updatedMessages;
       });
       setEditingMessageId(null);
@@ -297,7 +326,7 @@ const Home = () => {
             const updatedMessages = prev.map((msg) =>
               msg._id === messageId ? { ...msg, content: editedContent, isEdited: true } : msg
             );
-            saveMessages(updatedMessages); // Update IndexedDB
+            saveMessages(updatedMessages);
             return updatedMessages;
           });
           setEditingMessageId(null);
@@ -330,7 +359,16 @@ const Home = () => {
               />
             </div>
             <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/30 backdrop-blur-md px-2 sm:px-4 py-2 z-50">
-              <ChatInput onSend={handleSend} />
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-white/60 text-sm">Messages left: {messageCredits}</span>
+                <button
+                  onClick={handleBuyMoreMessages}
+                  className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1 rounded-full text-sm transition-colors"
+                >
+                  Buy More Messages
+                </button>
+              </div>
+              <ChatInput onSend={handleSend} isDisabled={messageCredits <= 0} />
             </div>
           </>
         )}

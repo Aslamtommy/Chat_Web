@@ -13,6 +13,7 @@ const userSchema = new Schema<IUser>({
   phoneNo: { type: String, required: true },
   place: { type: String, required: true },
   district: { type: String, required: true },
+  message_credits: { type: Number, default: 0 }, // New field for credits
 });
 
 // Add indexes for frequently queried fields

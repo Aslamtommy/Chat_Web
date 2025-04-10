@@ -15,6 +15,7 @@ class AuthService {
     place,
     district,
     role,
+    message_credits = 20,
   }: {
     username: string;
     email: string;
@@ -26,6 +27,7 @@ class AuthService {
     place: string;
     district: string;
     role?: 'user' | 'admin';
+    message_credits?: number; // Optional
   }): Promise<IUser> {
     // Check if email already exists
     const existingUser = await UserRepository.findByEmail(email);
@@ -62,6 +64,7 @@ class AuthService {
       place,
       district,
       role: role || 'user',
+      message_credits,
     });
     return user;
   }
@@ -148,6 +151,14 @@ class AuthService {
   async findByEmail(email: string): Promise<IUser | null> {
     const user = await UserRepository.findByEmail(email);
     console.log('findByEmail result for', email, ':', user); // Debug log
+    return user;
+  }
+
+  async addCredits(userId: string, credits: number): Promise<IUser> {
+    // Explicitly define the update object to include message_credits
+    const updateData: { message_credits: number } = { message_credits: credits };
+    const user = await UserRepository.updateById(userId, { $inc: updateData });
+    if (!user) throw new Error('User not found');
     return user;
   }
 }

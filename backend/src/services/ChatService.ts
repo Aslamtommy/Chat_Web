@@ -4,6 +4,7 @@ import { IChatThread, IMessage } from '../types';
 import mongoose from 'mongoose';
 import ChatThread from '../models/ChatThread';
 import { v2 as cloudinary } from 'cloudinary';
+import UserRepository from '../repositories/UserRepository';
 class ChatService {
   async getOrCreateChat(userId: string): Promise<IChatThread> {
     let chat = await ChatRepository.findByUserId(userId);
@@ -13,25 +14,44 @@ class ChatService {
     return chat;
   }
 
-  async saveMessage(chatThreadId: string, senderId: any, messageType: 'text' | 'image' | 'voice', content: string,duration:any): Promise<IChatThread> {
-    const message: IMessage = {
-      sender_id: new mongoose.Types.ObjectId(senderId),
-      message_type: messageType,
-      content,
-      duration,
-      timestamp: new Date(),
-    };
+  async saveMessage(chatThreadId: string, senderId: any, messageType: 'text' | 'image' | 'voice', content: string, duration: any): Promise<IChatThread> {
+ // Fetch user to check credits (only for non-admins, but we assume senderId === chatThreadId for users)
+ const user = await UserRepository.findById(senderId);
+ if (!user) throw new Error('User not found');
+ 
+ // Skip credit check/deduction for admins
+ const isAdmin = user.role === 'admin';
+ if (!isAdmin && (user.message_credits ?? 0) <= 0) {
+   throw new Error('Insufficient message credits');
+ }
 
-    // Set read_by_admin only if the sender is the user (chatThreadId represents the user ID)
-    if (senderId.toString() === chatThreadId) {
-      message.read_by_admin = false; // User-sent message, unread by admin
-    } else {
-      message.read_by_admin = true; // Admin-sent message, inherently "read" by admin
-    }
+ const message: IMessage = {
+   sender_id: new mongoose.Types.ObjectId(senderId),
+   message_type: messageType,
+   content,
+   duration,
+   timestamp: new Date(),
+ };
 
-    return ChatRepository.addMessage(chatThreadId, message);
-  }
+ if (senderId.toString() === chatThreadId) {
+   message.read_by_admin = false;
+ } else {
+   message.read_by_admin = true;
+ }
 
+ // Deduct 1 credit atomically for non-admin users
+ if (!isAdmin) {
+   const updateData: { message_credits: number } = { message_credits: -1 };
+   const updatedUser = await UserRepository.updateById(senderId, { $inc: updateData });
+   if (!updatedUser) throw new Error('Failed to deduct credits');
+   console.log('[ChatService] Deducted 1 credit for user:', senderId, 'new credits:', updatedUser.message_credits);
+ }
+
+ // Add the message to the chat thread
+ const updatedChat = await ChatRepository.addMessage(chatThreadId, message);
+ console.log('[ChatService] Message saved for user:', chatThreadId, 'message ID:', updatedChat.messages[updatedChat.messages.length - 1]._id);
+ return updatedChat;
+}
   async getAllChats(): Promise<IChatThread[]> {
     return ChatRepository.getAllThreads();
   }

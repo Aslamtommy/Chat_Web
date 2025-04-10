@@ -32,22 +32,28 @@ const Register = () => {
   const initiatePayment = async (data: RegisterForm) => {
     try {
       const sanitizedCustomerId = sanitizeCustomerId(data.email);
+      const paymentPayload = {
+        amount: 499,
+        currency: 'INR',
+        customer_id: sanitizedCustomerId,
+        customer_email: data.email,
+        customer_phone: data.phoneNo,
+        customer_name: data.username,
+        return_url: `${window.location.origin}/payment-success?paymentData=${encodeURIComponent(
+          JSON.stringify({ ...data, orderType: 'registration' })
+        )}`,
+      };
+      console.log('Register - Payment Payload:', paymentPayload);
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: 499,
-          currency: 'INR',
-          customer_id: sanitizedCustomerId,
-          customer_email: data.email,
-          customer_phone: data.phoneNo,
-          customer_name: data.username,
-          return_url: `${window.location.origin}/payment-success?userData=${encodeURIComponent(JSON.stringify(data))}`,
-        }),
+        body: JSON.stringify(paymentPayload),
       });
 
       const orderData = await response.json();
-      console.log('Order Response:', orderData);
+      console.log('Register - Order Response:', orderData);
+
       if (!orderData.success || !orderData.data.payment_session_id) {
         throw new Error(orderData.error || 'Failed to create payment order');
       }
@@ -55,13 +61,13 @@ const Register = () => {
       const cashfree = new Cashfree({
         mode: import.meta.env.VITE_CASHFREE_ENV || 'sandbox',
       });
-      console.log('Cashfree SDK initialized:', cashfree);
+      console.log('Register - Cashfree SDK initialized:', cashfree);
       cashfree.checkout({
         paymentSessionId: orderData.data.payment_session_id,
         redirectTarget: '_self',
       });
     } catch (error) {
-      console.error('Payment initiation error:', error);
+      console.error('Register - Payment initiation error:', error);
       toast.error('Failed to initiate payment: ' + (error as Error).message, {
         duration: 4000,
         position: 'top-center',
@@ -73,6 +79,7 @@ const Register = () => {
   const onSubmit = async (data: RegisterForm) => {
     try {
       const response = await authService.register(data);
+      console.log('Register - Validation Response:', response);
       if (!response.success) {
         throw new Error(response.error || 'Registration validation failed');
       }
@@ -81,9 +88,9 @@ const Register = () => {
         position: 'top-center',
         style: { background: '#333', color: '#fff' },
       });
-      await initiatePayment(data); // Proceed to payment directly
+      await initiatePayment(data);
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Register - Registration error:', error);
       const errorMessage = (error as Error).message;
       toast.error(errorMessage, {
         duration: 4000,

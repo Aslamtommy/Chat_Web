@@ -10,7 +10,7 @@ import FilesPage from './components/Pages/FilesPage';
 import { Toaster } from 'react-hot-toast';
 import { NotificationProvider } from './context/NotificationContext';
 import NotificationsPage from './components/Pages/NotificationsPage';
- 
+ import Payment from './components/auth/Payment';
 import PaymentSuccess from './components/auth/PaymentSuccess';
 import Login from './components/auth/Login';
 
@@ -65,6 +65,7 @@ const AppContent = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/payment" element={<Payment />} />
         <Route
           path="/home"
           element={

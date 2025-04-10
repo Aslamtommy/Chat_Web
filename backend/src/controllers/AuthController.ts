@@ -69,7 +69,7 @@ class AuthController {
         }
   
         console.log('No existing user, creating new:', email);
-        const user = await AuthService.register({ username, email, password, age, fathersName, mothersName, phoneNo, place, district, role });
+        const user = await AuthService.register({ username, email, password, age, fathersName, mothersName, phoneNo, place, district, role,message_credits: 20, });
         const secret = process.env.JWT_SECRET || 'mysecret';
         console.log('JWT_SECRET for token generation:', secret); // Debug
         const token = jwt.sign({ id: user._id, role: user.role }, secret, { expiresIn: '1h' });

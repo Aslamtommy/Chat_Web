@@ -11,6 +11,7 @@ export interface IUser extends Document {
   phoneNo: string;
   place: string;
   district: string;
+  message_credits?:number
 }
 
 export interface IMessage {
@@ -30,6 +31,7 @@ export interface IChatThread extends Document {
   user_id: string | any;
   messages: IMessage[];
   last_read_by_admin?: Date;
+ 
 }
 
 export interface IPaymentRequest {

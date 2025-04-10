@@ -21,11 +21,17 @@ class UserRepository {
     const user = new User(userData);
     return user.save();
   }
-  async updateById(id: string, updateData: Partial<IUser>): Promise<IUser | null> {
-    const user = await User.findById(id);
-    if (!user) return null;
-    user.set(updateData);
-    return user.save();
+  async updateById(id: string, updateData: any): Promise<IUser | null> {
+    // Use findOneAndUpdate for atomic updates, returning the updated document
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: id },
+      updateData,
+      { new: true, lean: true } // Return the updated document
+    );
+    if (!updatedUser) return null;
+    // Remove password from the returned object
+    const { password, ...userWithoutPassword } = updatedUser;
+    return userWithoutPassword as any
   }
   async deleteById(id: string): Promise<void> {
     const result = await User.findByIdAndDelete(id);
