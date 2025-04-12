@@ -3,7 +3,7 @@ import adminService, { saveMessages, getMessagesFromDB } from '../Services/admin
 import ChatList from '../../components/chat/ChatList';
 import ChatInput from '../../components/chat/ChatInput';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DollarSign, X, Check, User, ArrowLeft, Image } from 'lucide-react';
+import { DollarSign, X,  User, ArrowLeft, Image, ZoomIn, ZoomOut } from 'lucide-react';
 import AdminUserDetails from './AdminUserDetails';
 import chatService from '../Services/chatService';
 import axios from 'axios';
@@ -41,13 +41,23 @@ interface PaymentRequest {
 
 interface AdminChatWindowProps {
   userId: string | null;
-  username?: string | null;
+  username: string | null;
   socket: any;
   isMobile: boolean;
-  onBack?: () => void;
+  onBack: () => void;
+  onModalOpen: () => void;
+  onModalClose: () => void;
 }
 
-const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminChatWindowProps) => {
+const AdminChatWindow = ({ 
+  userId, 
+  username, 
+  socket, 
+  isMobile, 
+  onBack,
+  onModalOpen,
+  onModalClose 
+}: AdminChatWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [showToast, setShowToast] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -66,6 +76,9 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const adminId = useRef<string | null>(null);
   const isMounted = useRef(false);
+  const [showImageModal ] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageScale, setImageScale] = useState(1);
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current && isMounted.current) {
@@ -422,24 +435,44 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
     return true;
   };
 
+  const handleImageClick = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+    onModalOpen();
+  };
+
+  const handleCloseImageModal = () => {
+    setSelectedImage(null);
+    onModalClose();
+  };
+
+  const handleZoomIn = () => {
+    setImageScale(prev => Math.min(prev + 0.25, 3));
+  };
+
+  const handleZoomOut = () => {
+    setImageScale(prev => Math.max(prev - 0.25, 0.5));
+  };
+
   return (
-    <div className="flex flex-col h-full bg-black/40 backdrop-blur-sm">
+    <div className="flex flex-col h-full bg-gradient-to-br from-black via-black/95 to-black/90">
       {userId ? (
         <>
           <div className="sticky top-0 z-20 bg-gradient-to-r from-black/95 via-black/90 to-black/95 border-b border-amber-500/10 backdrop-blur-xl">
             <div className="flex items-center justify-between px-4 py-4">
               <div className="flex items-center space-x-3 min-w-0">
                 {isMobile && onBack && (
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={onBack}
-                    className="md:hidden p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30 flex-shrink-0"
+                    className="md:hidden p-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 transition-colors backdrop-blur-sm"
                   >
                     <ArrowLeft className="w-6 h-6" />
-                  </button>
+                  </motion.button>
                 )}
                 <div className="relative group flex-shrink-0">
-                  <div className="w-12 h-12 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-lg flex items-center justify-center border border-amber-500/20 transition-all duration-300 group-hover:border-amber-500/30">
-                    <span className="text-lg font-medium text-amber-400 group-hover:text-amber-300">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 flex items-center justify-center border border-amber-500/20 transition-all duration-300 group-hover:border-amber-500/30 backdrop-blur-sm">
+                    <span className="text-lg font-medium text-amber-500 group-hover:text-amber-400">
                       {username?.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -451,28 +484,28 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               </div>
               <div className="flex items-center space-x-2 flex-shrink-0">
                 <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setShowUserDetails(true)}
-                  className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
+                  className="p-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 transition-colors backdrop-blur-sm"
                   title="View User Details"
                 >
                   <User className="w-5 h-5" />
                 </motion.button>
                 <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setShowPaymentRequests(true)}
-                  className="p-2 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 text-amber-400 hover:text-amber-300 border border-amber-500/20 transition-all duration-300 hover:border-amber-500/30"
+                  className="p-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 transition-colors backdrop-blur-sm"
                   title="View Payment Requests"
                 >
                   <Image className="w-5 h-5" />
                 </motion.button>
                 <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setShowRequestModal(true)}
-                  className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-300 px-4 py-2 rounded-lg hover:text-amber-200 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300"
+                  className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-500 px-4 py-2 rounded-lg hover:text-amber-400 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300 backdrop-blur-sm"
                   title="Request Payment Screenshot"
                 >
                   <DollarSign className="w-5 h-5" />
@@ -509,81 +542,105 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
+                  className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-6"
                 >
                   <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
+                    initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-md"
+                    exit={{ scale: 0.95, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 sm:p-6 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[480px] h-[90vh] sm:h-auto sm:max-h-[85vh] overflow-y-auto backdrop-blur-sm"
                   >
-                    <h4 className="text-lg font-semibold text-white mb-3">Request Payment Screenshot</h4>
-                    <p className="text-white/80 text-sm mb-4">
+                    <div className="flex items-center justify-between mb-4 sm:mb-6">
+                      <h4 className="text-lg sm:text-xl font-semibold text-amber-50/90">Request Payment Screenshot</h4>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setShowRequestModal(false)}
+                        className="p-2 rounded-lg text-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </motion.button>
+                    </div>
+                    <p className="text-amber-500/70 text-sm mb-4 sm:mb-6">
                       Enter payment details for {username || 'this user'}.
                     </p>
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        name="accountNumber"
-                        value={paymentDetails.accountNumber}
-                        onChange={handleInputChange}
-                        placeholder="Account Number"
-                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                      />
-                      <input
-                        type="text"
-                        name="ifscCode"
-                        value={paymentDetails.ifscCode}
-                        onChange={handleInputChange}
-                        placeholder="IFSC Code"
-                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                      />
-                      <input
-                        type="text"
-                        name="amount"
-                        value={paymentDetails.amount}
-                        onChange={handleInputChange}
-                        placeholder="Amount (e.g., 500)"
-                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                      />
-                      <input
-                        type="text"
-                        name="name"
-                        value={paymentDetails.name}
-                        onChange={handleInputChange}
-                        placeholder="Account Holder Name"
-                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                      />
-                      <input
-                        type="text"
-                        name="upiId"
-                        value={paymentDetails.upiId}
-                        onChange={handleInputChange}
-                        placeholder="UPI ID (e.g., name@upi)"
-                        className="w-full p-2 rounded-lg bg-gray-800 text-white border border-amber-500/30 focus:outline-none focus:border-amber-500"
-                      />
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-amber-500/70 text-sm">Account Number</label>
+                        <input
+                          type="text"
+                          name="accountNumber"
+                          value={paymentDetails.accountNumber}
+                          onChange={handleInputChange}
+                          placeholder="Enter account number"
+                          className="w-full p-3 rounded-lg bg-black/50 text-amber-50 border border-amber-500/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all duration-300"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-amber-500/70 text-sm">IFSC Code</label>
+                        <input
+                          type="text"
+                          name="ifscCode"
+                          value={paymentDetails.ifscCode}
+                          onChange={handleInputChange}
+                          placeholder="Enter IFSC code"
+                          className="w-full p-3 rounded-lg bg-black/50 text-amber-50 border border-amber-500/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all duration-300"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-amber-500/70 text-sm">Amount</label>
+                        <input
+                          type="text"
+                          name="amount"
+                          value={paymentDetails.amount}
+                          onChange={handleInputChange}
+                          placeholder="Enter amount"
+                          className="w-full p-3 rounded-lg bg-black/50 text-amber-50 border border-amber-500/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all duration-300"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-amber-500/70 text-sm">Account Holder Name</label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={paymentDetails.name}
+                          onChange={handleInputChange}
+                          placeholder="Enter account holder name"
+                          className="w-full p-3 rounded-lg bg-black/50 text-amber-50 border border-amber-500/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all duration-300"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-amber-500/70 text-sm">UPI ID</label>
+                        <input
+                          type="text"
+                          name="upiId"
+                          value={paymentDetails.upiId}
+                          onChange={handleInputChange}
+                          placeholder="Enter UPI ID"
+                          className="w-full p-3 rounded-lg bg-black/50 text-amber-50 border border-amber-500/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all duration-300"
+                        />
+                      </div>
                     </div>
-                    <div className="flex justify-end space-x-2 mt-4">
+                    <div className="flex justify-end space-x-3 mt-6">
                       <motion.button
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setShowRequestModal(false)}
-                        className="bg-gradient-to-r from-gray-600 to-gray-700 text-white px-3 py-1.5 rounded-lg hover:from-gray-700 hover:to-gray-800 flex items-center space-x-1 text-sm"
+                        className="px-4 py-2 rounded-lg bg-black/50 text-amber-500/70 hover:text-amber-500 border border-amber-500/20 hover:border-amber-500/30 transition-colors"
                       >
-                        <X className="w-4 h-4" />
-                        <span>Cancel</span>
+                        Cancel
                       </motion.button>
                       <motion.button
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={handleRequestScreenshot}
                         disabled={!isPaymentDetailsValid()}
-                        className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg flex items-center space-x-1 text-sm ${
-                          !isPaymentDetailsValid() ? 'opacity-60 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-800'
+                        className={`px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-500 border border-amber-500/20 hover:border-amber-500/30 transition-all ${
+                          !isPaymentDetailsValid() ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
-                        <Check className="w-4 h-4" />
-                        <span>Send</span>
+                        Send Request
                       </motion.button>
                     </div>
                   </motion.div>
@@ -597,24 +654,27 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
+                  className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-6"
                 >
                   <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
+                    initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto"
+                    exit={{ scale: 0.95, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 sm:p-6 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[640px] h-[90vh] sm:h-auto sm:max-h-[85vh] overflow-y-auto backdrop-blur-sm"
                   >
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-lg font-semibold text-white">Payment Requests for {username}</h4>
-                      <button
+                    <div className="flex items-center justify-between mb-4 sm:mb-6">
+                      <h4 className="text-lg sm:text-xl font-semibold text-amber-50/90">Payment Requests</h4>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
                         onClick={() => setShowPaymentRequests(false)}
-                        className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"
+                        className="p-2 rounded-lg text-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
                       >
                         <X className="w-5 h-5" />
-                      </button>
+                      </motion.button>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-3 sm:space-y-4">
                       {paymentRequests
                         .filter((pr) => pr.userId?._id === userId)
                         .map((pr) => (
@@ -622,53 +682,62 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
                             key={pr._id}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="p-3 bg-gray-800 rounded-lg border border-white/10"
+                            className="p-4 rounded-lg bg-black/50 border border-amber-500/20"
                           >
-                            <div className="space-y-1 text-sm text-gray-200">
-                              <div className="flex justify-between">
-                                <span className="font-medium text-gray-400">Account:</span>
-                                <span>{pr.paymentDetails.accountNumber}</span>
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-amber-500/70 text-sm">Account Number</span>
+                                <span className="text-amber-50">{pr.paymentDetails.accountNumber}</span>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="font-medium text-gray-400">IFSC:</span>
-                                <span>{pr.paymentDetails.ifscCode}</span>
+                              <div className="flex justify-between items-center">
+                                <span className="text-amber-500/70 text-sm">IFSC Code</span>
+                                <span className="text-amber-50">{pr.paymentDetails.ifscCode}</span>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="font-medium text-gray-400">Amount:</span>
-                                <span className="text-amber-400 font-semibold">₹{pr.paymentDetails.amount}</span>
+                              <div className="flex justify-between items-center">
+                                <span className="text-amber-500/70 text-sm">Amount</span>
+                                <span className="text-amber-400 font-medium">₹{pr.paymentDetails.amount}</span>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="font-medium text-gray-400">Name:</span>
-                                <span>{pr.paymentDetails.name}</span>
+                              <div className="flex justify-between items-center">
+                                <span className="text-amber-500/70 text-sm">Name</span>
+                                <span className="text-amber-50">{pr.paymentDetails.name}</span>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="font-medium text-gray-400">UPI:</span>
-                                <span>{pr.paymentDetails.upiId}</span>
+                              <div className="flex justify-between items-center">
+                                <span className="text-amber-500/70 text-sm">UPI ID</span>
+                                <span className="text-amber-50">{pr.paymentDetails.upiId}</span>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="font-medium text-gray-400">Status:</span>
-                                <span className={pr.status === 'uploaded' ? 'text-green-400' : 'text-yellow-400'}>
+                              <div className="flex justify-between items-center">
+                                <span className="text-amber-500/70 text-sm">Status</span>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  pr.status === 'uploaded' 
+                                    ? 'bg-green-500/10 text-green-400' 
+                                    : 'bg-amber-500/10 text-amber-400'
+                                }`}>
                                   {pr.status.charAt(0).toUpperCase() + pr.status.slice(1)}
                                 </span>
                               </div>
                               {pr.screenshotUrl && (
-                                <div className="mt-2">
-                                  <a
-                                    href={pr.screenshotUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-amber-400 hover:underline flex items-center space-x-1 text-sm"
-                                  >
-                                    <Image className="w-4 h-4" />
-                                    <span>View Screenshot</span>
-                                  </a>
-                                </div>
+                                <motion.div
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => {
+                                    if (pr.screenshotUrl) {
+                                      handleImageClick(pr.screenshotUrl);
+                                    }
+                                  }}
+                                  className="flex items-center space-x-2 text-amber-500 hover:text-amber-400 transition-colors cursor-pointer"
+                                >
+                                  <Image className="w-4 h-4" />
+                                  <span className="text-sm">View Screenshot</span>
+                                </motion.div>
                               )}
                             </div>
                           </motion.div>
                         ))}
                       {paymentRequests.filter((pr) => pr.userId?._id === userId).length === 0 && (
-                        <p className="text-white/70 text-center text-sm">No payment requests found.</p>
+                        <div className="flex flex-col items-center justify-center py-8 text-amber-500/50">
+                          <Image className="w-12 h-12 mb-3" />
+                          <p className="text-sm">No payment requests found</p>
+                        </div>
                       )}
                     </div>
                   </motion.div>
@@ -676,55 +745,118 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
               )}
             </AnimatePresence>
 
-            {showUserDetails && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-2"
-              >
+            <AnimatePresence>
+              {showUserDetails && (
                 <motion.div
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-gradient-to-b from-gray-900 to-black p-4 rounded-2xl shadow-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-6"
                 >
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-lg font-semibold text-white">User Details</h4>
-                    <button
-                      onClick={() => setShowUserDetails(false)}
-                      className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/5"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <AdminUserDetails userId={userId} />
+                  <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 sm:p-6 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[640px] h-[90vh] sm:h-auto sm:max-h-[85vh] overflow-y-auto backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between mb-4 sm:mb-6">
+                      <h4 className="text-lg sm:text-xl font-semibold text-amber-50/90">User Details</h4>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setShowUserDetails(false)}
+                        className="p-2 rounded-lg text-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </motion.button>
+                    </div>
+                    <AdminUserDetails userId={userId} />
+                  </motion.div>
                 </motion.div>
-              </motion.div>
-            )}
-          </div>
+              )}
+            </AnimatePresence>
 
-          <AnimatePresence>
-            {showToast && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-20 left-2 right-2 md:bottom-6 md:right-4 md:left-auto bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg shadow-md text-sm flex items-center justify-center space-x-2 z-30"
-              >
-                <DollarSign className="w-4 h-4" />
-                <span>Screenshot request sent/received</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <AnimatePresence>
+              {showToast && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="fixed bottom-6 right-6 z-50"
+                >
+                  <div className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 text-amber-500 px-4 py-3 rounded-lg shadow-lg border border-amber-500/20 backdrop-blur-sm flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5" />
+                    <span className="text-sm">Screenshot request sent/received</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-white/70 text-base">
+          <p className="text-amber-500/50 text-base">
             {isMobile ? 'Select a user to chat' : 'No user selected'}
           </p>
         </div>
       )}
+
+      {/* Image View Modal */}
+      <AnimatePresence>
+        {showImageModal && selectedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-[60] p-4"
+            onClick={handleCloseImageModal}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="relative max-w-[90vw] max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="absolute top-4 right-4 z-10 flex items-center space-x-2">
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleZoomIn}
+                  className="p-2 rounded-lg bg-black/50 text-amber-500 hover:text-amber-400 hover:bg-black/70 transition-colors backdrop-blur-sm"
+                >
+                  <ZoomIn className="w-5 h-5" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleZoomOut}
+                  className="p-2 rounded-lg bg-black/50 text-amber-500 hover:text-amber-400 hover:bg-black/70 transition-colors backdrop-blur-sm"
+                >
+                  <ZoomOut className="w-5 h-5" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleCloseImageModal}
+                  className="p-2 rounded-lg bg-black/50 text-amber-500 hover:text-amber-400 hover:bg-black/70 transition-colors backdrop-blur-sm"
+                >
+                  <X className="w-5 h-5" />
+                </motion.button>
+              </div>
+              <motion.img
+                src={selectedImage}
+                alt="Payment Screenshot"
+                className="rounded-lg shadow-2xl border border-amber-500/20"
+                style={{ transform: `scale(${imageScale})` }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

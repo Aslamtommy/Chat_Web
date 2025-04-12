@@ -15,6 +15,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const syncTriggered = useRef(false); // Track if sync was triggered
   const syncDebounce = useRef<NodeJS.Timeout | null>(null); // Debounce sync requests
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const checkMobileView = () => {
@@ -140,6 +141,7 @@ const AdminDashboard = () => {
         showBackButton={isMobileView && selectedUserId !== null}
         onBack={handleBackToUsers}
         hideOnMobile={isMobileView && selectedUserId !== null}
+        isModalOpen={isModalOpen}
       />
       <div className="flex flex-1 overflow-hidden">
         {(!isMobileView || selectedUserId === null) && (
@@ -148,6 +150,7 @@ const AdminDashboard = () => {
             selectedUserId={selectedUserId}
             socket={socketRef.current}
             isMobile={isMobileView}
+            isModalOpen={isModalOpen}
           />
         )}
         {(!isMobileView || selectedUserId !== null) && (
@@ -158,6 +161,8 @@ const AdminDashboard = () => {
               socket={socketRef.current}
               isMobile={isMobileView}
               onBack={handleBackToUsers}
+              onModalOpen={() => setIsModalOpen(true)}
+              onModalClose={() => setIsModalOpen(false)}
             />
           </div>
         )}
