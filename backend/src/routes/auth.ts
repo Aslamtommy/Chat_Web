@@ -3,6 +3,7 @@ import express from 'express';
 import AuthController from '../controllers/AuthController';
 import authMiddleware from '../middleware/auth';
 import PaymentController from '../controllers/PaymentController';
+import LinkController from '../controllers/LinkController';
 import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
@@ -21,4 +22,6 @@ router.get('/payment-requests', authMiddleware as RequestHandler, PaymentControl
 router.post('/payment-request/:id/upload', authMiddleware as RequestHandler, upload.single('file'), PaymentController.uploadScreenshot);
 router.post('/buy-credits', authMiddleware as RequestHandler, PaymentController.buyCredits);
 router.post('/finalize-credits', PaymentController.finalizeCredits);
+
+router.get('/links', LinkController.getLinks);
 export default router;

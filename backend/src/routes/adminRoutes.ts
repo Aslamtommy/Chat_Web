@@ -7,6 +7,7 @@ import { validateUserId } from '../middleware/validateUserId';
 import uploadMiddleware from '../middleware/upload';
 import { RequestHandler } from 'express';
 import PaymentController from '../controllers/PaymentController';
+import LinkController from '../controllers/LinkController';
 const router = express.Router();
 
 router.post('/auth/login', AdminAuthController.adminLogin);
@@ -21,4 +22,10 @@ router.post('/chats/user/:userId/mark-read', authMiddleware as RequestHandler, a
 router.post('/payment-request', authMiddleware as RequestHandler, PaymentController.createPaymentRequest);
 router.get('/payment-requests', authMiddleware as RequestHandler, PaymentController.getAdminPaymentRequests);
 router.delete('/users/:id', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, AdminAuthController.deleteUser); // Added DELETE route
+
+// Link Management Routes (Admin-only)
+router.get('/links', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, LinkController.getLinks);
+router.post('/links', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, LinkController.createLink);
+router.put('/links/:id', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, LinkController.updateLink);
+router.delete('/links/:id', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, LinkController.deleteLink);
 export default router;

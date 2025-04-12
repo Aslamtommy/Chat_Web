@@ -498,7 +498,7 @@ const AdminChatWindow = ({ userId, username, socket, isMobile, onBack }: AdminCh
             </div>
             <div className="sticky bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/90 to-black/85 backdrop-blur-xl border-t border-amber-500/10">
               <div className="px-2 py-1 sm:px-3 sm:py-1">
-                <ChatInput onSend={handleSend} />
+                <ChatInput onSend={handleSend} isDisabled={false} />
               </div>
             </div>
           </div>
