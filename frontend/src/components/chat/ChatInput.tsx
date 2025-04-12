@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Send, Paperclip } from 'lucide-react';
+import Loading from '../common/Loading';
 
 interface ChatInputProps {
   onSend: (
@@ -8,11 +9,13 @@ interface ChatInputProps {
     duration?: number
   ) => void;
   isDisabled: boolean;
+  isUploading?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled, isUploading = false }) => {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -22,6 +25,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled }) => {
   const startRecording = async () => {
     if (isDisabled) return;
     try {
+      setIsProcessing(true);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
@@ -40,11 +44,13 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled }) => {
         const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000);
         onSend('voice', audioFile, finalDuration);
         stream.getTracks().forEach((track) => track.stop());
+        setIsProcessing(false);
         console.log('Recording stopped, final duration:', finalDuration);
       };
 
       mediaRecorder.start();
       setIsRecording(true);
+      setIsProcessing(false);
 
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -55,6 +61,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled }) => {
       console.error('Error starting recording:', error);
       alert('Failed to access microphone. Please allow microphone permissions.');
       setIsRecording(false);
+      setIsProcessing(false);
     }
   };
 
@@ -111,16 +118,27 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled }) => {
       <form onSubmit={handleSubmit} className="flex items-center gap-3">
         {!isRecording && !isDisabled && (
           <>
-            <Paperclip
+            <button
+              type="button"
               onClick={openFilePicker}
-              className="text-white/60 hover:text-amber-500 cursor-pointer w-5 h-5 transition-colors"
-            />
+              disabled={isUploading}
+              className={`text-white/60 hover:text-amber-500 cursor-pointer w-5 h-5 transition-colors ${
+                isUploading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isUploading ? (
+                <Loading size="sm" variant="gold" />
+              ) : (
+                <Paperclip className="w-5 h-5" />
+              )}
+            </button>
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileUpload}
               accept="image/*"
               className="hidden"
+              disabled={isUploading}
             />
           </>
         )}
@@ -130,13 +148,19 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled }) => {
             <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-xl">
               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
               <span className="text-white text-sm">Recording</span>
-              <button
-                type="button"
-                onClick={stopRecording}
-                className="bg-amber-500 hover:bg-amber-600 text-white p-2 rounded-full transition-colors ml-auto"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+              {isProcessing ? (
+                <div className="ml-auto">
+                  <Loading size="sm" variant="gold" />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  className="bg-amber-500 hover:bg-amber-600 text-white p-2 rounded-full transition-colors ml-auto"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ) : (
             <input
@@ -165,11 +189,15 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, isDisabled }) => {
               type="button"
               onClick={startRecording}
               className={`p-2 rounded-full transition-colors bg-transparent ${
-                isDisabled ? 'cursor-not-allowed opacity-50' : ''
+                isDisabled || isProcessing ? 'cursor-not-allowed opacity-50' : ''
               }`}
-              disabled={isDisabled}
+              disabled={isDisabled || isProcessing}
             >
-              <Mic className="w-5 h-5 text-amber-500" />
+              {isProcessing ? (
+                <Loading size="sm" variant="gold" />
+              ) : (
+                <Mic className="w-5 h-5 text-amber-500" />
+              )}
             </button>
           )}
         </div>

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import adminService from '../Services/adminService';
 import { User, Mail, Phone, MapPin, Calendar, Users } from 'lucide-react';
+import Loading from '../common/Loading';
 
 interface User {
   username: string;
@@ -20,17 +21,20 @@ interface AdminUserDetailsProps {
 
 const AdminUserDetails = ({ userId }: AdminUserDetailsProps) => {
   const [user, setUser] = useState<User | null>(null);
-   
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const fetchUserDetails = async () => {
       if (!userId) return;
       try {
+        setIsLoading(true);
         const userData = await adminService.getUserById(userId);
         setUser(userData);
       } catch (error) {
         console.error('Failed to fetch user details:', error);
         setUser(null);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchUserDetails();
@@ -40,7 +44,11 @@ const AdminUserDetails = ({ userId }: AdminUserDetailsProps) => {
 
   const UserDetailsContent = () => (
     <div className="space-y-8">
-      {user ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center h-32">
+          <Loading size="lg" variant="gold" />
+        </div>
+      ) : user ? (
         <>
           {/* Profile Header */}
           <div className="flex items-center space-x-6 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
@@ -129,7 +137,7 @@ const AdminUserDetails = ({ userId }: AdminUserDetailsProps) => {
         </>
       ) : (
         <div className="flex items-center justify-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-amber-500 border-t-transparent" />
+          <p className="text-white/60">No user data available</p>
         </div>
       )}
     </div>

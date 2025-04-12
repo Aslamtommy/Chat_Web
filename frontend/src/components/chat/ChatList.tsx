@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import ChatMessage from './ChatMessage';
+import Loading from '../common/Loading';
 
 interface Message {
   _id: string;
@@ -23,6 +24,8 @@ interface ChatListProps {
   onEditSave?: (messageId: string) => void;
   onEditCancel?: () => void;
   onDelete?: (messageId: string) => void; // Optional, only provided for admins
+  isLoading?: boolean;
+  isSending?: boolean;
 }
 
 const ChatList = forwardRef<HTMLDivElement, ChatListProps>(
@@ -36,9 +39,19 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(
       onEditSave,
       onEditCancel,
       onDelete,
+      isLoading = false,
+      isSending = false,
     },
     ref
   ) => {
+    if (isLoading) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <Loading size="lg" variant="mystic" />
+        </div>
+      );
+    }
+
     return (
       <div ref={ref} className="flex-1 overflow-y-auto p-6 space-y-6">
         {messages.map((message) => (
@@ -74,6 +87,13 @@ const ChatList = forwardRef<HTMLDivElement, ChatListProps>(
             }
           />
         ))}
+        {isSending && (
+          <div className="flex justify-end">
+            <div className="bg-primary-100 rounded-lg p-3 max-w-[75%]">
+              <Loading size="sm" variant="primary" />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
