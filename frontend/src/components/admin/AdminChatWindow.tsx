@@ -542,17 +542,18 @@ const AdminChatWindow = ({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-6"
+                  className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
                 >
                   <motion.div
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 sm:p-6 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[480px] h-[90vh] sm:h-auto sm:max-h-[85vh] overflow-y-auto backdrop-blur-sm"
+                    // Changed from w-full max-w-[480px] h-[90vh] sm:h-auto sm:max-h-[85vh] to w-full max-w-[400px] max-h-[70vh] to fit below header
+                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[400px] max-h-[70vh] overflow-y-auto backdrop-blur-sm"
                   >
-                    <div className="flex items-center justify-between mb-4 sm:mb-6">
-                      <h4 className="text-lg sm:text-xl font-semibold text-amber-50/90">Request Payment Screenshot</h4>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-lg font-semibold text-amber-50/90">Request Payment Screenshot</h4>
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
@@ -562,10 +563,10 @@ const AdminChatWindow = ({
                         <X className="w-5 h-5" />
                       </motion.button>
                     </div>
-                    <p className="text-amber-500/70 text-sm mb-4 sm:mb-6">
+                    <p className="text-amber-500/70 text-sm mb-4">
                       Enter payment details for {username || 'this user'}.
                     </p>
-                    <div className="space-y-3 sm:space-y-4">
+                    <div className="space-y-3">
                       <div className="space-y-2">
                         <label className="text-amber-500/70 text-sm">Account Number</label>
                         <input
@@ -647,7 +648,7 @@ const AdminChatWindow = ({
                 </motion.div>
               )}
             </AnimatePresence>
-
+  
             <AnimatePresence>
               {showPaymentRequests && (
                 <motion.div
@@ -661,7 +662,8 @@ const AdminChatWindow = ({
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 sm:p-6 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[640px] h-[90vh] sm:h-auto sm:max-h-[85vh] overflow-y-auto backdrop-blur-sm"
+                    // Changed from w-full max-w-[640px] h-[90vh] sm:h-auto sm:max-h-[85vh] to w-full max-w-[500px] max-h-[70vh] to fit below header
+                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 sm:p-6 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[500px] max-h-[70vh] overflow-y-auto backdrop-blur-sm"
                   >
                     <div className="flex items-center justify-between mb-4 sm:mb-6">
                       <h4 className="text-lg sm:text-xl font-semibold text-amber-50/90">Payment Requests</h4>
@@ -707,11 +709,13 @@ const AdminChatWindow = ({
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-amber-500/70 text-sm">Status</span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  pr.status === 'uploaded' 
-                                    ? 'bg-green-500/10 text-green-400' 
-                                    : 'bg-amber-500/10 text-amber-400'
-                                }`}>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    pr.status === 'uploaded'
+                                      ? 'bg-green-500/10 text-green-400'
+                                      : 'bg-amber-500/10 text-amber-400'
+                                  }`}
+                                >
                                   {pr.status.charAt(0).toUpperCase() + pr.status.slice(1)}
                                 </span>
                               </div>
@@ -744,7 +748,7 @@ const AdminChatWindow = ({
                 </motion.div>
               )}
             </AnimatePresence>
-
+  
             <AnimatePresence>
               {showUserDetails && (
                 <motion.div
@@ -758,7 +762,8 @@ const AdminChatWindow = ({
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 sm:p-6 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[640px] h-[90vh] sm:h-auto sm:max-h-[85vh] overflow-y-auto backdrop-blur-sm"
+                    // Changed from w-full max-w-[640px] h-[90vh] sm:h-auto sm:max-h-[85vh] to w-full max-w-[500px] max-h-[70vh] to fit below header
+                    className="bg-gradient-to-b from-black/90 to-black/80 p-4 sm:p-6 rounded-2xl shadow-2xl border border-amber-500/20 w-full max-w-[500px] max-h-[70vh] overflow-y-auto backdrop-blur-sm"
                   >
                     <div className="flex items-center justify-between mb-4 sm:mb-6">
                       <h4 className="text-lg sm:text-xl font-semibold text-amber-50/90">User Details</h4>
@@ -776,7 +781,7 @@ const AdminChatWindow = ({
                 </motion.div>
               )}
             </AnimatePresence>
-
+  
             <AnimatePresence>
               {showToast && (
                 <motion.div
@@ -801,7 +806,7 @@ const AdminChatWindow = ({
           </p>
         </div>
       )}
-
+  
       {/* Image View Modal */}
       <AnimatePresence>
         {showImageModal && selectedImage && (
@@ -817,7 +822,8 @@ const AdminChatWindow = ({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="relative max-w-[90vw] max-h-[90vh]"
+              // Changed from max-w-[90vw] max-h-[90vh] to max-w-[90vw] max-h-[70vh] to fit below header
+              className="relative max-w-[90vw] max-h-[70vh]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="absolute top-4 right-4 z-10 flex items-center space-x-2">
