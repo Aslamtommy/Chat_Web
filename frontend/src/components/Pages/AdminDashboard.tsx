@@ -38,6 +38,16 @@ const AdminDashboard = () => {
       return;
     }
 
+    // Token check with API
+    fetch(`${import.meta.env.VITE_API_URL}/admin/check-token`, {
+      method: 'HEAD',
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .catch(() => {
+        localStorage.removeItem('adminToken');
+        navigate('/');
+      });
+
     if (!socketRef.current) {
       console.log('[AdminDashboard] Initializing socket with token:', token);
       socketRef.current = io(`${import.meta.env.VITE_API_URL}`, {

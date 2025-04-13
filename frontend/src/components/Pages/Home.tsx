@@ -112,7 +112,15 @@ const Home = () => {
       navigate('/');
       return;
     }
-
+// Token check with API
+fetch(`${import.meta.env.VITE_API_URL}/auth/check-token`, {
+  method: 'HEAD',
+  headers: { 'Authorization': `Bearer ${token}` },
+})
+  .catch(() => {
+    localStorage.removeItem('token');
+    navigate('/');
+  });
     if (!navigator.onLine) {
       getMessagesFromDB()
         .then((cachedMessages) => {

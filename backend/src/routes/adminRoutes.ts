@@ -28,4 +28,11 @@ router.get('/links', authMiddleware as RequestHandler, adminRoleMiddleware as Re
 router.post('/links', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, LinkController.createLink);
 router.put('/links/:id', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, LinkController.updateLink);
 router.delete('/links/:id', authMiddleware as RequestHandler, adminRoleMiddleware as RequestHandler, LinkController.deleteLink);
+
+// Token check endpoint
+router.head('/check-token', authMiddleware as RequestHandler, (req: any, res: any) => {
+    // If authMiddleware passes, the token is valid
+    res.status(200).send(); // Return 200 OK if token is valid
+  });
+  
 export default router;

@@ -104,7 +104,7 @@ class AuthService {
   async updateProfile(
     userId: string,
     profileData: {
-      age?: number;  // Accept both number and string temporarily
+      age?: number;
       fathersName?: string;
       mothersName?: string;
       phoneNo?: string;
@@ -145,9 +145,10 @@ class AuthService {
       throw new Error('Failed to update user');
     }
 
-    const { password, ...userWithoutPassword } = updatedUser.toObject();
-    return userWithoutPassword as IUser;
+    // Return the updated user directly since it's already a plain object
+    return updatedUser as IUser;
   }
+
   async findByEmail(email: string): Promise<IUser | null> {
     const user = await UserRepository.findByEmail(email);
     console.log('findByEmail result for', email, ':', user); // Debug log

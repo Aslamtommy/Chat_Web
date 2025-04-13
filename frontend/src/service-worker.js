@@ -13,8 +13,8 @@ const urlsToCache = [
 // API endpoints to cache dynamically
 const API_CACHE_NAME = 'arabic-jyothisham-api-cache-v1';
 const apiEndpointsToCache = [
-  `${import.meta.env.VITE_API_URL}/users`, // Adjust this to match your actual endpoint for getAllUsers
-  `${import.meta.env.VITE_API_URL}/admin`, // Example for payment requests
+  `${import.meta.env.VITE_API_URL}/auth`,
+  `${import.meta.env.VITE_API_URL}/admin`,
 ];
 
 // Install event: Cache static assets
@@ -35,7 +35,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
 
-  // Handle API requests (e.g., fetching user list)
+  // Handle API requests (e.g., fetching user list or admin data)
   if (requestUrl.pathname.startsWith(`${import.meta.env.VITE_API_URL}/`)) {
     event.respondWith(
       networkFirst(event.request)
@@ -44,7 +44,66 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle navigation and static asset requests
+  // Handle navigation and static asset requests with token check for /home and /admin/dashboard
+  if (requestUrl.pathname.includes('/admin/dashboard')) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return fetch(`${import.meta.env.VITE_API_URL}/admin/check-token`, {
+            method: 'HEAD',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('adminToken') || ''}` // Placeholder; adjust client-side
+            }
+          })
+            .then((response) => {
+              if (response.ok) return cachedResponse;
+              return fetch(event.request).then((networkResponse) => {
+                if (networkResponse.ok) {
+                  caches.open(CACHE_NAME).then((cache) =>
+                    cache.put(event.request, networkResponse.clone())
+                  );
+                }
+                return networkResponse;
+              });
+            })
+            .catch(() => fetch(event.request));
+        }
+        return fetch(event.request);
+      })
+    );
+    return;
+  }
+
+  if (requestUrl.pathname.includes('/home')) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return fetch(`${import.meta.env.VITE_API_URL}/auth/check-token`, {
+            method: 'HEAD',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token') || ''}` // Placeholder; adjust client-side
+            }
+          })
+            .then((response) => {
+              if (response.ok) return cachedResponse;
+              return fetch(event.request).then((networkResponse) => {
+                if (networkResponse.ok) {
+                  caches.open(CACHE_NAME).then((cache) =>
+                    cache.put(event.request, networkResponse.clone())
+                  );
+                }
+                return networkResponse;
+              });
+            })
+            .catch(() => fetch(event.request));
+        }
+        return fetch(event.request);
+      })
+    );
+    return;
+  }
+
+  // Handle other navigation and static asset requests
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

@@ -24,4 +24,9 @@ router.post('/buy-credits', authMiddleware as RequestHandler, PaymentController.
 router.post('/finalize-credits', PaymentController.finalizeCredits);
 
 router.get('/links', LinkController.getLinks);
+
+// Token check endpoint for user
+router.head('/check-token', authMiddleware as RequestHandler, (req: any, res: any) => {
+  res.status(200).send(); // Return 200 OK if token is valid
+});
 export default router;
